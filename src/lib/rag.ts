@@ -101,7 +101,7 @@ export async function answerQuestion(
       return {
         answer: `วันที่ ${formatThaiDateKey(
           targetDateKeys[0],
-        )} ยังไม่เจอกิจกรรมของวิทยาลัยในปฏิทินที่มีครับ`,
+        )} ผมยังไม่เจอรายการกิจกรรมในปฏิทินครับ`,
         sources: [],
       };
     }
@@ -419,8 +419,8 @@ function buildCalendarDateAnswer(
   if (schoolEvents.length > 0) {
     const eventText =
       schoolEvents.length === 1
-        ? `มีกิจกรรมของวิทยาลัยคือ ${schoolEvents[0]}`
-        : `มีกิจกรรมของวิทยาลัยดังนี้:\n${schoolEvents
+        ? buildSingleCalendarEventSentence(dateText, schoolEvents[0])
+        : `วันที่ ${dateText} มีรายการในปฏิทินดังนี้:\n${schoolEvents
             .map((event, index) => `${index + 1}. ${event}`)
             .join("\n")}`;
     const noteText =
@@ -430,7 +430,7 @@ function buildCalendarDateAnswer(
           )}`
         : "";
 
-    return `มีครับ วันที่ ${dateText} ${eventText}${noteText}`;
+    return `${eventText}${noteText}`;
   }
 
   if (nonActivityDays.length > 0) {
@@ -443,12 +443,12 @@ function buildCalendarDateAnswer(
       ? "วันหยุดนักขัตฤกษ์/วันหยุดราชการ"
       : "วันหยุดหรือหมายเหตุตามปฏิทินวิทยาลัย";
 
-    return `วันที่ ${dateText} ยังไม่มีกิจกรรมของวิทยาลัยในปฏิทินที่มีครับ แต่เป็น${dayLabel}: ${nonActivityDays.join(
+    return `วันที่ ${dateText} ไม่มีรายการกิจกรรมของวิทยาลัยในปฏิทินที่ผมมีครับ วันนั้นเป็น${dayLabel}: ${nonActivityDays.join(
       ", ",
     )}`;
   }
 
-  return `วันที่ ${dateText} ยังไม่เจอกิจกรรมของวิทยาลัยในปฏิทินที่มีครับ`;
+  return `วันที่ ${dateText} ผมยังไม่เจอรายการกิจกรรมในปฏิทินครับ`;
 }
 
 function uniqueCalendarItems(documents: RetrievedDocument[]): string[] {
@@ -461,6 +461,18 @@ function uniqueCalendarItems(documents: RetrievedDocument[]): string[] {
         .filter(Boolean),
     ),
   ];
+}
+
+function buildSingleCalendarEventSentence(dateText: string, event: string): string {
+  if (event.startsWith("เปิดภาคเรียน")) {
+    return `วันที่ ${dateText} เป็นวัน${event} ครับ`;
+  }
+
+  if (event.startsWith("วัน")) {
+    return `วันที่ ${dateText} เป็น${event} ครับ`;
+  }
+
+  return `วันที่ ${dateText} มี${event} ครับ`;
 }
 
 async function buildStandaloneQuestion(
