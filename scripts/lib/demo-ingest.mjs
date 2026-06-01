@@ -266,37 +266,53 @@ function tailText(text, maxLength) {
 }
 
 async function createEmbedding(text, config) {
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${config.embeddingModel}:embedContent`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": config.geminiApiKey,
-      },
-      body: JSON.stringify({
-        content: {
-          parts: [{ text }],
+  const maxAttempts = 5;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${config.embeddingModel}:embedContent`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": config.geminiApiKey,
         },
-        taskType: "RETRIEVAL_DOCUMENT",
-        output_dimensionality: config.embeddingDimensions,
-      }),
-    },
-  );
+        body: JSON.stringify({
+          content: {
+            parts: [{ text }],
+          },
+          taskType: "RETRIEVAL_DOCUMENT",
+          output_dimensionality: config.embeddingDimensions,
+        }),
+      },
+    );
 
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`Gemini embedding failed ${response.status}: ${body}`);
+    if (!response.ok) {
+      const body = await response.text();
+
+      if (attempt < maxAttempts && isRetryableGeminiStatus(response.status)) {
+        await sleep(1000 * attempt ** 2);
+        continue;
+      }
+
+      throw new Error(`Gemini embedding failed ${response.status}: ${body}`);
+    }
+
+    const data = await response.json();
+    const values = data.embedding?.values;
+
+    if (!Array.isArray(values) || values.length !== config.embeddingDimensions) {
+      throw new Error("Gemini embedding dimension did not match the Supabase schema");
+    }
+
+    return values;
   }
 
-  const data = await response.json();
-  const values = data.embedding?.values;
+  throw new Error("Gemini embedding failed after retries");
+}
 
-  if (!Array.isArray(values) || values.length !== config.embeddingDimensions) {
-    throw new Error("Gemini embedding dimension did not match the Supabase schema");
-  }
-
-  return values;
+function isRetryableGeminiStatus(status) {
+  return [429, 500, 502, 503, 504].includes(status);
 }
 
 export async function deleteSource(config, sourceName) {

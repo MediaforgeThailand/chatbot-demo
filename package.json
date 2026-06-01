@@ -10,7 +10,8 @@
     "ingest:urls": "node scripts/ingest-urls.mjs",
     "ingest:files": "node scripts/ingest-files.mjs",
     "ingest:ics": "node scripts/ingest-ics.mjs",
-    "ingest:pdfs": "node scripts/ingest-pdfs.mjs"
+    "ingest:pdfs": "node scripts/ingest-pdfs.mjs",
+    "ingest:wordpress": "node scripts/ingest-wordpress.mjs"
   },
   "dependencies": {
     "cheerio": "^1.2.0",

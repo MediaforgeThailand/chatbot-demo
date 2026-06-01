@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 
-import { answerQuestion, RagConfigurationError, type ConversationMessage } from "@/lib/rag";
+import {
+  answerQuestion,
+  RagConfigurationError,
+  type ConversationMemory,
+  type ConversationMessage,
+} from "@/lib/rag";
+
+const MAX_HISTORY_MESSAGES = 24;
 
 export async function POST(request: Request) {
   let payload: unknown;
@@ -30,9 +37,10 @@ export async function POST(request: Request) {
   }
 
   const history = readHistory(payload);
+  const memory = readMemory(payload);
 
   try {
-    const result = await answerQuestion(question, history);
+    const result = await answerQuestion(question, history, memory);
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof RagConfigurationError) {
@@ -52,6 +60,46 @@ export async function POST(request: Request) {
       { status: 500 },
     );
   }
+}
+
+function readMemory(payload: unknown): ConversationMemory {
+  if (
+    typeof payload !== "object" ||
+    payload === null ||
+    !("memory" in payload) ||
+    typeof payload.memory !== "object" ||
+    payload.memory === null ||
+    Array.isArray(payload.memory)
+  ) {
+    return {};
+  }
+
+  const rawMemory = payload.memory as Record<string, unknown>;
+  const calendarYear =
+    typeof rawMemory.calendarYear === "number" &&
+    Number.isInteger(rawMemory.calendarYear) &&
+    rawMemory.calendarYear >= 2000 &&
+    rawMemory.calendarYear <= 2600
+      ? rawMemory.calendarYear
+      : undefined;
+  const calendarMonthKey =
+    typeof rawMemory.calendarMonthKey === "string" &&
+    /^20\d{2}-\d{2}$/.test(rawMemory.calendarMonthKey)
+      ? rawMemory.calendarMonthKey
+      : undefined;
+  const corrections = Array.isArray(rawMemory.corrections)
+    ? rawMemory.corrections
+        .filter((correction): correction is string => typeof correction === "string")
+        .map((correction) => correction.trim())
+        .filter(Boolean)
+        .slice(-8)
+    : undefined;
+
+  return {
+    calendarYear,
+    calendarMonthKey,
+    corrections,
+  };
 }
 
 function readHistory(payload: unknown): ConversationMessage[] {
@@ -79,5 +127,5 @@ function readHistory(payload: unknown): ConversationMessage[] {
       content: message.content.trim(),
     }))
     .filter((message) => message.content.length > 0)
-    .slice(-8);
+    .slice(-MAX_HISTORY_MESSAGES);
 }

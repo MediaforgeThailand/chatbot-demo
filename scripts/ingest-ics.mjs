@@ -379,18 +379,50 @@ function buildMarkdown(url, events, fromDateKey, calendarInfo) {
 }
 
 function buildCalendarChunks(url, events, fromDateKey, calendarInfo) {
-  const monthGroups = groupEventsByMonth(events);
+  const eventOccurrences = expandEventOccurrences(events);
+  const monthGroups = groupEventsByMonth(eventOccurrences);
   const chunks = [];
 
   for (const [monthKey, monthEvents] of monthGroups) {
     chunks.push(buildMonthChunk(url, monthKey, monthEvents, fromDateKey, calendarInfo));
   }
 
-  for (const event of events) {
+  for (const event of eventOccurrences) {
     chunks.push(buildEventChunk(url, event, calendarInfo));
   }
 
   return chunks;
+}
+
+function expandEventOccurrences(events) {
+  const occurrences = [];
+
+  for (const event of events) {
+    const endDateKey =
+      event.endDateKey && event.endDateKey >= event.startDateKey
+        ? event.endDateKey
+        : event.startDateKey;
+    let dateKey = event.startDateKey;
+    let daysInRange = 0;
+
+    while (dateKey <= endDateKey) {
+      occurrences.push({
+        ...event,
+        occurrenceDateKey: dateKey,
+        occurrenceText: formatDateKey(dateKey),
+        isMultiDayEvent: endDateKey !== event.startDateKey,
+      });
+
+      dateKey = addDays(dateKey, 1);
+      daysInRange += 1;
+
+      if (daysInRange > 370) {
+        throw new Error(`Calendar event spans too many days: ${event.summary}`);
+      }
+    }
+  }
+
+  return occurrences;
 }
 
 function buildMonthChunk(url, monthKey, events, fromDateKey, calendarInfo) {
@@ -439,13 +471,14 @@ function appendEventList(lines, title, events) {
 }
 
 function appendEventLines(lines, event) {
-  lines.push(`### ${event.startText} - ${event.summary}`);
+  lines.push(`### ${event.occurrenceText ?? event.startText} - ${event.summary}`);
   lines.push(`Event type: ${event.eventType}`);
   lines.push(`Event type label: ${event.eventTypeLabel}`);
   lines.push(`Is school activity: ${event.isSchoolActivity ? "yes" : "no"}`);
   lines.push(`Answer guidance: ${event.answerGuidance}`);
 
   if (event.endText && event.endDateKey !== event.startDateKey) {
+    lines.push(`Event range: ${event.startText} - ${event.endText}`);
     lines.push(`End: ${event.endText}`);
   }
 
@@ -461,24 +494,29 @@ function appendEventLines(lines, event) {
 }
 
 function buildEventChunk(url, event, calendarInfo) {
+  const dateKey = event.occurrenceDateKey ?? event.startDateKey;
+  const dateText = event.occurrenceText ?? event.startText;
   const lines = [
     "# PSC activity calendar event",
     "",
     `Calendar: ${calendarInfo.name || "PSC calendar"}`,
     `Source: ${url}`,
-    `Date: ${event.startText}`,
-    `Date key: ${event.startDateKey}`,
-    `Month: ${formatMonthKey(event.startDateKey.slice(0, 7))}`,
+    `Date: ${dateText}`,
+    `Date key: ${dateKey}`,
+    `Month: ${formatMonthKey(dateKey.slice(0, 7))}`,
     `Activity: ${event.summary}`,
     `Event type: ${event.eventType}`,
     `Event type label: ${event.eventTypeLabel}`,
     `Is school activity: ${event.isSchoolActivity ? "yes" : "no"}`,
     `Answer guidance: ${event.answerGuidance}`,
-    `Search terms: กิจกรรมวันที่ ${event.startText}, ปฏิทินกิจกรรม ${event.startDateKey}`,
+    `Search terms: กิจกรรมวันที่ ${dateText}, ปฏิทินกิจกรรม ${dateKey}`,
   ];
 
   if (event.endText && event.endDateKey !== event.startDateKey) {
+    lines.push(`Event range: ${event.startText} - ${event.endText}`);
+    lines.push(`Start: ${event.startText}`);
     lines.push(`End: ${event.endText}`);
+    lines.push(`This date is inside the event range.`);
   }
 
   if (event.location && event.location !== "-------") {
@@ -495,11 +533,14 @@ function buildEventChunk(url, event, calendarInfo) {
       chunk_kind: "calendar_event",
       calendar_name: calendarInfo.name,
       calendar_description: calendarInfo.description,
-      date_key: event.startDateKey,
-      month_key: event.startDateKey.slice(0, 7),
+      date_key: dateKey,
+      start_date_key: event.startDateKey,
+      end_date_key: event.endDateKey ?? event.startDateKey,
+      month_key: dateKey.slice(0, 7),
       event_type: event.eventType,
       event_type_label: event.eventTypeLabel,
       is_school_activity: event.isSchoolActivity,
+      is_multi_day_event: event.isMultiDayEvent === true,
       summary: event.summary,
     },
   };
@@ -509,7 +550,7 @@ function groupEventsByMonth(events) {
   const groups = new Map();
 
   for (const event of events) {
-    const monthKey = event.startDateKey.slice(0, 7);
+    const monthKey = (event.occurrenceDateKey ?? event.startDateKey).slice(0, 7);
     const monthEvents = groups.get(monthKey) ?? [];
     monthEvents.push(event);
     groups.set(monthKey, monthEvents);
