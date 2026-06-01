@@ -725,8 +725,8 @@ function Logo({
       className={`relative inline-flex shrink-0 items-center justify-center overflow-hidden ${className}`}
     >
       {!loaded ? (
-        <span className="absolute inset-0 flex items-center justify-center rounded-[inherit] bg-primary-fixed font-bold text-primary">
-          PS
+        <span className="absolute inset-0 flex items-center justify-center rounded-[inherit] bg-primary-container text-[0.62rem] font-bold tracking-tight text-on-primary">
+          PSC
         </span>
       ) : null}
       {/* eslint-disable-next-line @next/next/no-img-element */}
