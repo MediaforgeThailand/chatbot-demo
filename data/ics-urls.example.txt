@@ -1,0 +1,3 @@
+# Copy this file to data/ics-urls.txt, then add one public .ics calendar URL per line.
+
+https://www.google.com/calendar/ical/ec5rauu3p2je10ccd8uq05eivs@group.calendar.google.com/public/basic.ics

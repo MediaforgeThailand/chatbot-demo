@@ -6,11 +6,17 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "ingest:urls": "node scripts/ingest-urls.mjs",
+    "ingest:files": "node scripts/ingest-files.mjs",
+    "ingest:ics": "node scripts/ingest-ics.mjs",
+    "ingest:pdfs": "node scripts/ingest-pdfs.mjs"
   },
   "dependencies": {
+    "cheerio": "^1.2.0",
     "lucide-react": "^1.17.0",
     "next": "16.2.6",
+    "pdf-parse": "^2.4.5",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },

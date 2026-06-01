@@ -1,0 +1,7 @@
+# Copy this file to data/urls.txt, then add one public school/college page per line.
+# Keep the list small for the demo: admissions, tuition, programs, calendar, rules,
+# scholarships, and contact pages are usually enough.
+
+https://example.edu/admissions
+https://example.edu/tuition
+https://example.edu/contact

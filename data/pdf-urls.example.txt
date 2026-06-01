@@ -1,0 +1,3 @@
+# Copy this file to data/pdf-urls.txt, then add one public PDF per line.
+
+https://www3.pongsawadi.ac.th/psc2023/wp-content/uploads/2023/03/psc2568.pdf

@@ -40,3 +40,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local demo knowledge base inputs and scrape cache
+/data/urls.txt
+/data/ics-urls.txt
+/data/pdf-urls.txt
+/data/sources/*
+!/data/sources/.gitkeep
+!/data/sources/*.example.md

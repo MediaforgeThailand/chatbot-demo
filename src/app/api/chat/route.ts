@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { answerQuestion, RagConfigurationError } from "@/lib/rag";
+import { answerQuestion, RagConfigurationError, type ConversationMessage } from "@/lib/rag";
 
 export async function POST(request: Request) {
   let payload: unknown;
@@ -29,8 +29,10 @@ export async function POST(request: Request) {
     );
   }
 
+  const history = readHistory(payload);
+
   try {
-    const result = await answerQuestion(question);
+    const result = await answerQuestion(question, history);
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof RagConfigurationError) {
@@ -50,4 +52,32 @@ export async function POST(request: Request) {
       { status: 500 },
     );
   }
+}
+
+function readHistory(payload: unknown): ConversationMessage[] {
+  if (
+    typeof payload !== "object" ||
+    payload === null ||
+    !("history" in payload) ||
+    !Array.isArray(payload.history)
+  ) {
+    return [];
+  }
+
+  return payload.history
+    .filter(
+      (message): message is ConversationMessage =>
+        typeof message === "object" &&
+        message !== null &&
+        "role" in message &&
+        (message.role === "user" || message.role === "assistant") &&
+        "content" in message &&
+        typeof message.content === "string",
+    )
+    .map((message) => ({
+      role: message.role,
+      content: message.content.trim(),
+    }))
+    .filter((message) => message.content.length > 0)
+    .slice(-8);
 }

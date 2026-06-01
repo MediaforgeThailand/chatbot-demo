@@ -4,32 +4,24 @@ import {
   AlertCircle,
   Bot,
   Database,
-  FileText,
   Loader2,
   Send,
   User,
 } from "lucide-react";
 import { FormEvent, useMemo, useState } from "react";
 
-type ChatSource = {
-  id: number;
-  sourceName: string;
-  similarity: number;
-  metadata: Record<string, unknown>;
-};
-
 type ChatMessage = {
   id: string;
   role: "assistant" | "user";
   content: string;
-  sources?: ChatSource[];
 };
 
 const sampleQuestions = [
-  "สมัครเรียนต้องใช้เอกสารอะไรบ้าง",
-  "ค่าเทอมของหลักสูตร ปวช. เท่าไหร่",
-  "มีทุนการศึกษาแบบไหนบ้าง",
-  "ติดต่อฝ่ายทะเบียนได้ช่องทางไหน",
+  "สมัครเรียน ปวช. ต้องใช้เอกสารอะไรบ้าง",
+  "วิทยาลัยเปิดสอนหลักสูตรอะไรบ้าง",
+  "ชำระค่าเทอมได้ช่องทางไหน",
+  "ระเบียบการแต่งกายของนักศึกษามีอะไรบ้าง",
+  "ถ้ามาสายหรือขาดเรียนมีระเบียบอย่างไร",
 ];
 
 const initialMessages: ChatMessage[] = [
@@ -72,17 +64,21 @@ export function ChatDemo() {
     setMessages((currentMessages) => [...currentMessages, userMessage]);
 
     try {
+      const history = messages
+        .filter((message) => message.id !== "welcome")
+        .slice(-8)
+        .map(({ role, content }) => ({ role, content }));
+
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ question: trimmedQuestion }),
+        body: JSON.stringify({ question: trimmedQuestion, history }),
       });
 
       const data = (await response.json()) as {
         answer?: string;
-        sources?: ChatSource[];
         error?: string;
         missingEnv?: string[];
       };
@@ -101,7 +97,6 @@ export function ChatDemo() {
           id: crypto.randomUUID(),
           role: "assistant",
           content: data.answer ?? "ไม่พบคำตอบ",
-          sources: data.sources ?? [],
         },
       ]);
     } catch (error) {
@@ -131,9 +126,9 @@ export function ChatDemo() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f6f7f9] text-[#18202f]">
-      <div className="mx-auto grid min-h-screen w-full max-w-7xl grid-cols-1 gap-0 lg:grid-cols-[320px_1fr]">
-        <aside className="border-b border-[#d7dce5] bg-white px-5 py-5 lg:border-b-0 lg:border-r">
+    <main className="h-screen overflow-hidden bg-[#f6f7f9] text-[#18202f]">
+      <div className="mx-auto grid h-screen w-full max-w-7xl grid-cols-1 grid-rows-[auto_1fr] gap-0 overflow-hidden lg:grid-cols-[320px_1fr] lg:grid-rows-1">
+        <aside className="overflow-y-auto border-b border-[#d7dce5] bg-white px-5 py-5 lg:h-screen lg:border-b-0 lg:border-r">
           <div className="flex items-center gap-3">
             <div className="flex size-10 items-center justify-center rounded-md bg-[#0f766e] text-white">
               <Bot size={22} aria-hidden="true" />
@@ -185,7 +180,7 @@ export function ChatDemo() {
           </div>
         </aside>
 
-        <section className="flex min-h-screen flex-col">
+        <section className="flex min-h-0 flex-col overflow-hidden">
           <header className="border-b border-[#d7dce5] bg-white px-5 py-4">
             <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
               <div>
@@ -198,7 +193,7 @@ export function ChatDemo() {
             </div>
           </header>
 
-          <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-6">
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">
             <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
               {messages.map((message) => (
                 <article
@@ -221,35 +216,6 @@ export function ChatDemo() {
                     <p className="whitespace-pre-wrap text-sm leading-6">
                       {message.content}
                     </p>
-
-                    {message.sources && message.sources.length > 0 ? (
-                      <div className="mt-3 border-t border-[#e4e8ef] pt-3">
-                        <div className="flex items-center gap-2 text-xs font-semibold uppercase text-[#596579]">
-                          <FileText size={14} aria-hidden="true" />
-                          Sources
-                        </div>
-                        <ul className="mt-2 space-y-2">
-                          {message.sources.map((source) => (
-                            <li
-                              key={source.id}
-                              className="rounded border border-[#e4e8ef] bg-[#fbfcfd] px-3 py-2 text-xs text-[#596579]"
-                            >
-                              <div className="flex items-center justify-between gap-3">
-                                <span className="font-medium text-[#18202f]">
-                                  {source.sourceName}
-                                </span>
-                                <span>{Math.round(source.similarity * 100)}%</span>
-                              </div>
-                              {Object.keys(source.metadata).length > 0 ? (
-                                <code className="mt-1 block overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[11px]">
-                                  {JSON.stringify(source.metadata)}
-                                </code>
-                              ) : null}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ) : null}
                   </div>
 
                   {message.role === "user" ? <MessageIcon tone="user" /> : null}
