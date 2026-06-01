@@ -99,9 +99,9 @@ export async function answerQuestion(
 
     if (isCalendarDateQuestion(groundedQuestion) && targetDateKeys.length > 0) {
       return {
-        answer: `ไม่พบกิจกรรมของวิทยาลัยในข้อมูลที่มีสำหรับวันที่ ${formatThaiDateKey(
+        answer: `วันที่ ${formatThaiDateKey(
           targetDateKeys[0],
-        )}`,
+        )} ยังไม่เจอกิจกรรมของวิทยาลัยในปฏิทินที่มีครับ`,
         sources: [],
       };
     }
@@ -109,6 +109,20 @@ export async function answerQuestion(
     return {
       answer: "ไม่พบข้อมูลที่เกี่ยวข้องในเอกสารของโรงเรียน/วิทยาลัย",
       sources: [],
+    };
+  }
+
+  const calendarDateAnswer = buildCalendarDateAnswer(scopedDocuments, groundedQuestion);
+
+  if (calendarDateAnswer) {
+    return {
+      answer: calendarDateAnswer,
+      sources: scopedDocuments.map((document) => ({
+        id: document.id,
+        sourceName: document.source_name,
+        similarity: document.similarity,
+        metadata: document.metadata,
+      })),
     };
   }
 
@@ -361,6 +375,92 @@ function addRelativeDateContext(question: string, dateContext: DateContext): str
   }
 
   return `${question}\n${dateReferences.join("\n")}`;
+}
+
+function buildCalendarDateAnswer(
+  documents: RetrievedDocument[],
+  groundedQuestion: string,
+): string | null {
+  if (!isCalendarDateQuestion(groundedQuestion)) {
+    return null;
+  }
+
+  const targetDateKeys = extractTargetDateKeys(groundedQuestion);
+
+  if (targetDateKeys.length === 0) {
+    return null;
+  }
+
+  const exactDateDocuments = documents.filter((document) => {
+    const dateKey = document.metadata?.date_key;
+    return typeof dateKey === "string" && targetDateKeys.includes(dateKey);
+  });
+
+  if (exactDateDocuments.length === 0) {
+    return null;
+  }
+
+  const dateText = formatThaiDateKey(targetDateKeys[0]);
+  const schoolEvents = uniqueCalendarItems(
+    exactDateDocuments.filter(
+      (document) =>
+        document.metadata?.is_school_activity === true ||
+        document.metadata?.event_type === "school_event",
+    ),
+  );
+  const nonActivityDays = uniqueCalendarItems(
+    exactDateDocuments.filter(
+      (document) =>
+        document.metadata?.is_school_activity === false &&
+        document.metadata?.event_type !== "school_event",
+    ),
+  );
+
+  if (schoolEvents.length > 0) {
+    const eventText =
+      schoolEvents.length === 1
+        ? `มีกิจกรรมของวิทยาลัยคือ ${schoolEvents[0]}`
+        : `มีกิจกรรมของวิทยาลัยดังนี้:\n${schoolEvents
+            .map((event, index) => `${index + 1}. ${event}`)
+            .join("\n")}`;
+    const noteText =
+      nonActivityDays.length > 0
+        ? `\n\nหมายเหตุ: วันเดียวกันมีข้อมูลวันหยุด/หมายเหตุคือ ${nonActivityDays.join(
+            ", ",
+          )}`
+        : "";
+
+    return `มีครับ วันที่ ${dateText} ${eventText}${noteText}`;
+  }
+
+  if (nonActivityDays.length > 0) {
+    const eventTypes = new Set(
+      exactDateDocuments
+        .map((document) => document.metadata?.event_type)
+        .filter(Boolean),
+    );
+    const dayLabel = eventTypes.has("public_holiday")
+      ? "วันหยุดนักขัตฤกษ์/วันหยุดราชการ"
+      : "วันหยุดหรือหมายเหตุตามปฏิทินวิทยาลัย";
+
+    return `วันที่ ${dateText} ยังไม่มีกิจกรรมของวิทยาลัยในปฏิทินที่มีครับ แต่เป็น${dayLabel}: ${nonActivityDays.join(
+      ", ",
+    )}`;
+  }
+
+  return `วันที่ ${dateText} ยังไม่เจอกิจกรรมของวิทยาลัยในปฏิทินที่มีครับ`;
+}
+
+function uniqueCalendarItems(documents: RetrievedDocument[]): string[] {
+  return [
+    ...new Set(
+      documents
+        .map((document) => document.metadata?.summary)
+        .filter((summary): summary is string => typeof summary === "string")
+        .map((summary) => summary.trim())
+        .filter(Boolean),
+    ),
+  ];
 }
 
 async function buildStandaloneQuestion(
