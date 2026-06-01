@@ -718,30 +718,31 @@ function Logo({
   className?: string;
   priority?: boolean;
 }) {
-  const [loaded, setLoaded] = useState(false);
+  // Show the logo by default; fall back to the "PSC" mark only on load error.
+  // Visibility is never gated on onLoad, which does not fire when the image is
+  // already cached before React attaches the handler.
+  const [failed, setFailed] = useState(false);
 
   return (
     <span
       className={`relative inline-flex shrink-0 items-center justify-center overflow-hidden ${className}`}
     >
-      {!loaded ? (
+      {failed ? (
         <span className="absolute inset-0 flex items-center justify-center rounded-[inherit] bg-primary-container text-[0.62rem] font-bold tracking-tight text-on-primary">
           PSC
         </span>
-      ) : null}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src="/logo-pongsawadi.png"
-        alt="ตราวิทยาลัยเทคโนโลยีพงษ์สวัสดิ์"
-        width={size}
-        height={size}
-        loading={priority ? "eager" : "lazy"}
-        onLoad={() => setLoaded(true)}
-        onError={() => setLoaded(false)}
-        className={`h-full w-full object-contain transition-opacity duration-300 ${
-          loaded ? "opacity-100" : "opacity-0"
-        }`}
-      />
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src="/logo-pongsawadi.png"
+          alt="ตราวิทยาลัยเทคโนโลยีพงษ์สวัสดิ์"
+          width={size}
+          height={size}
+          loading={priority ? "eager" : "lazy"}
+          onError={() => setFailed(true)}
+          className="h-full w-full object-contain"
+        />
+      )}
     </span>
   );
 }
