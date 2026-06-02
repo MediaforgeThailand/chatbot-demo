@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                "surface-container-high": "#e7e8e9",
+                "on-tertiary-fixed": "#1c1b1b",
+                "tertiary-container": "#757474",
+                "surface-container-highest": "#e1e3e4",
+                "surface-container-lowest": "#ffffff",
+                "on-primary": "#ffffff",
+                "on-secondary-container": "#716066",
+                "inverse-primary": "#ffb0cc",
+                "on-surface": "#191c1d",
+                "surface-variant": "#e1e3e4",
+                "surface-tint": "#b8006c",
+                "tertiary-fixed": "#e5e2e1",
+                "secondary-fixed-dim": "#d7c1c8",
+                "outline-variant": "#e1bdc8",
+                "surface-bright": "#f8f9fa",
+                "inverse-on-surface": "#f0f1f2",
+                "on-tertiary-container": "#f7feff",
+                "tertiary-fixed-dim": "#c8c6c5",
+                "tertiary": "#5d5c5b",
+                "error-container": "#ffdad6",
+                "on-tertiary-fixed-variant": "#474746",
+                "on-primary-fixed": "#3e0021",
+                "on-tertiary": "#ffffff",
+                "background": "#f8f9fa",
+                "on-secondary": "#ffffff",
+                "on-error": "#ffffff",
+                "primary-container": "#df0e84",
+                "on-primary-container": "#fffbff",
+                "on-surface-variant": "#594048",
+                "secondary-fixed": "#f4dce4",
+                "surface-container": "#edeeef",
+                "surface-container-low": "#f3f4f5",
+                "secondary-container": "#f4dce4",
+                "primary": "#b30069",
+                "error": "#ba1a1a",
+                "primary-fixed-dim": "#ffb0cc",
+                "on-error-container": "#93000a",
+                "primary-fixed": "#ffd9e4",
+                "on-secondary-fixed-variant": "#524249",
+                "on-primary-fixed-variant": "#8d0051",
+                "on-background": "#191c1d",
+                "surface": "#f8f9fa",
+                "outline": "#8d6f79",
+                "surface-dim": "#d9dadb",
+                "secondary": "#6b5a60",
+                "on-secondary-fixed": "#25181e",
+                "inverse-surface": "#2e3132"
+            },
+            "borderRadius": {
+                "DEFAULT": "1rem",
+                "lg": "2rem",
+                "xl": "3rem",
+                "full": "9999px"
+            },
+            "spacing": {
+                "container-max": "1280px",
+                "unit": "8px",
+                "gutter": "24px",
+                "margin-desktop": "40px",
+                "margin-mobile": "20px"
+            },
+            "fontFamily": {
+                "headline-lg": ["Hanken Grotesk"],
+                "body-sm": ["Hanken Grotesk"],
+                "label-bold": ["Hanken Grotesk"],
+                "headline-xl": ["Hanken Grotesk"],
+                "body-md": ["Hanken Grotesk"],
+                "headline-lg-mobile": ["Hanken Grotesk"]
+            },
+            "fontSize": {
+                "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                "body-sm": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                "label-bold": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                "headline-xl": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "600"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      .glass-effect {
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+      }
+      .shimmer-ai {
+        background: linear-gradient(90deg, #b30069 0%, #df0e84 50%, #b30069 100%);
+        background-size: 200% auto;
+        animation: shimmer 3s linear infinite;
+      }
+      @keyframes shimmer {
+        to { background-position: 200% center; }
+      }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md overflow-hidden h-screen w-screen relative">
+<!-- Blurred Background Website Mockup -->
+<div class="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+<div class="max-w-container-max mx-auto px-margin-desktop py-12 opacity-30 blur-md">
+<!-- Header Mock -->
+<div class="flex justify-between items-center mb-16">
+<div class="flex items-center gap-4">
+<img alt="PSC Logo" class="h-12 w-12 rounded-full" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCFRt4AkOdxnpKkF8xtSn9K0ci2ep6YmeakALng7Ed_H6cDRpb2Bb_8r7CDsKmYUeebP7YqOgEx1BjOlbWWkTc5W5588I2slAmMgRVmWemnbE8rkw7UBDfwgwq6uClkLKHVhCo21MiMUR7Yd9IQFnzG3pjnkoC4RxEmq7t2aLYWOu07oetmWglWZYUakbi-qtnjcAtTRff7m9WoOAHWeWktfVnGWn_wS-rbM07Nlkxut4eoNPkaAmxwet-3OoI3awuicgW5-ZeQ15wV"/>
+<div class="font-headline-lg text-headline-lg text-on-surface">Pongsawadi Tech</div>
+</div>
+<div class="flex gap-8 text-on-surface-variant font-label-bold">
+<span>Admissions</span>
+<span>Programs</span>
+<span>Student Life</span>
+<span>Contact</span>
+</div>
+</div>
+<!-- Hero Mock -->
+<div class="flex gap-12 mb-20">
+<div class="w-1/2 space-y-6">
+<div class="h-16 w-3/4 bg-surface-container-high rounded-lg"></div>
+<div class="h-4 w-full bg-surface-container rounded-lg"></div>
+<div class="h-4 w-5/6 bg-surface-container rounded-lg"></div>
+<div class="h-12 w-40 bg-primary/20 rounded-full"></div>
+</div>
+<div class="w-1/2 h-80 bg-surface-container-highest rounded-xl" data-alt="A bright and airy photograph of the modern Pongsawadi Technological College campus exterior. The building features clean architectural lines and expansive glass windows, surrounded by lush green tropical plants and clear blue skies. The scene is bathed in natural daylight, reflecting a professional and optimistic academic atmosphere with a light-mode color palette dominated by white and soft pink accents.">
+</div>
+</div>
+<!-- Content Grid Mock -->
+<div class="grid grid-cols-3 gap-8">
+<div class="h-48 bg-surface-container-low rounded-lg"></div>
+<div class="h-48 bg-surface-container-low rounded-lg"></div>
+<div class="h-48 bg-surface-container-low rounded-lg"></div>
+</div>
+</div>
+</div>
+<!-- MAIN CHAT INTERFACE (The Task) -->
+<div class="fixed bottom-margin-desktop right-margin-desktop z-50 flex flex-col items-end gap-4 max-w-[420px] w-full">
+<!-- Chat Window -->
+<div class="bg-surface-bright flex flex-col shadow-lg shadow-primary/10 rounded-lg overflow-hidden border border-surface-container-high w-full transition-all duration-300 origin-bottom-right scale-100 opacity-100" id="chatWindow" style="height: 600px;">
+<!-- TopAppBar from Shared Components JSON -->
+<header class="flex justify-between items-center px-gutter py-unit w-full bg-surface-bright/80 backdrop-blur-xl dark:bg-inverse-surface/80 rounded-t-lg shadow-md shadow-primary/20">
+<div class="flex items-center gap-3">
+<img alt="PSC Logo" class="h-8 w-8 rounded-full object-cover border border-primary/20" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCFRt4AkOdxnpKkF8xtSn9K0ci2ep6YmeakALng7Ed_H6cDRpb2Bb_8r7CDsKmYUeebP7YqOgEx1BjOlbWWkTc5W5588I2slAmMgRVmWemnbE8rkw7UBDfwgwq6uClkLKHVhCo21MiMUR7Yd9IQFnzG3pjnkoC4RxEmq7t2aLYWOu07oetmWglWZYUakbi-qtnjcAtTRff7m9WoOAHWeWktfVnGWn_wS-rbM07Nlkxut4eoNPkaAmxwet-3OoI3awuicgW5-ZeQ15wV"/>
+<div>
+<h1 class="font-headline-lg text-headline-lg-mobile font-bold text-primary dark:text-primary-fixed-dim leading-none">PSC Assistant</h1>
+<p class="text-[10px] text-on-surface-variant font-label-bold">Online • Admissions AI</p>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<button class="p-1 rounded-full text-on-surface-variant hover:bg-primary-container/10 transition-colors cursor-pointer active:scale-95 transition-transform" onclick="toggleChat()">
+<span class="material-symbols-outlined" data-icon="minimize">minimize</span>
+</button>
+<button class="p-1 rounded-full text-on-surface-variant hover:bg-primary-container/10 transition-colors cursor-pointer active:scale-95 transition-transform" onclick="toggleChat()">
+<span class="material-symbols-outlined" data-icon="close">close</span>
+</button>
+</div>
+</header>
+<!-- Chat Content Area -->
+<div class="flex-1 overflow-y-auto p-gutter space-y-gutter bg-surface-container-lowest scroll-smooth">
+<!-- Welcome Message -->
+<div class="flex gap-3 max-w-[85%]">
+<div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-white text-[18px]" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+</div>
+<div class="space-y-3">
+<div class="bg-surface-container-low text-on-surface p-4 rounded-[24px] rounded-tl-none text-body-md shadow-sm">
+                            Hello! I'm the PSC Admissions Bot. How can I help you with admissions or college info today?
+                        </div>
+<!-- Quick Action Chips -->
+<div class="flex flex-wrap gap-2">
+<button class="px-4 py-2 bg-secondary-container text-on-secondary-fixed text-body-sm font-semibold rounded-full border border-outline-variant hover:bg-primary-fixed-dim transition-all active:scale-95">Tuition Fees</button>
+<button class="px-4 py-2 bg-secondary-container text-on-secondary-fixed text-body-sm font-semibold rounded-full border border-outline-variant hover:bg-primary-fixed-dim transition-all active:scale-95">Scholarships</button>
+<button class="px-4 py-2 bg-secondary-container text-on-secondary-fixed text-body-sm font-semibold rounded-full border border-outline-variant hover:bg-primary-fixed-dim transition-all active:scale-95">How to Apply</button>
+<button class="px-4 py-2 bg-secondary-container text-on-secondary-fixed text-body-sm font-semibold rounded-full border border-outline-variant hover:bg-primary-fixed-dim transition-all active:scale-95">Majors</button>
+</div>
+</div>
+</div>
+<!-- User Message Mockup (Self-Illustration of Style) -->
+<div class="flex justify-end">
+<div class="max-w-[85%] bg-primary text-on-primary p-4 rounded-[24px] rounded-tr-none text-body-md shadow-md shadow-primary/20">
+                        Tell me about the Digital Media program.
+                    </div>
+</div>
+<!-- AI Typing Indicator -->
+<div class="flex gap-3 max-w-[85%] hidden" id="typing">
+<div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-white text-[18px]" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+</div>
+<div class="bg-surface-container-low p-4 rounded-[24px] rounded-tl-none flex gap-1 items-center">
+<div class="w-2 h-2 bg-primary rounded-full animate-bounce"></div>
+<div class="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:0.2s]"></div>
+<div class="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:0.4s]"></div>
+</div>
+</div>
+</div>
+<!-- Input Bar -->
+<div class="p-gutter pt-0 bg-surface-container-lowest">
+<div class="relative flex items-center bg-surface-container-low rounded-full border border-surface-container-high focus-within:border-primary focus-within:shadow-[0_0_12px_rgba(179,0,105,0.15)] transition-all">
+<input class="flex-1 bg-transparent border-none focus:ring-0 px-6 py-4 text-body-md text-on-surface" placeholder="Type your question..." type="text"/>
+<div class="pr-2">
+<button class="w-10 h-10 rounded-full bg-primary text-on-primary flex items-center justify-center hover:bg-primary-container transition-all active:scale-90" id="sendBtn">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">send</span>
+</button>
+</div>
+</div>
+<!-- Footer from Shared Components JSON (Simplified for chat context) -->
+<footer class="flex flex-col items-center py-2 gap-1 bg-transparent">
+<div class="flex gap-4 text-label-bold text-on-surface-variant font-label-bold">
+<span class="opacity-80 hover:opacity-100 hover:underline cursor-pointer">Privacy Policy</span>
+<span class="opacity-80 hover:opacity-100 hover:underline cursor-pointer">Help Center</span>
+</div>
+<p class="text-[10px] text-on-surface-variant opacity-60">© 2024 PSC Admissions AI</p>
+</footer>
+</div>
+</div>
+<!-- Floating Action Button (FAB) - Trigger -->
+<button class="hidden w-16 h-16 rounded-full bg-primary-container text-on-primary-container shadow-lg shadow-primary/30 flex items-center justify-center transition-all hover:scale-110 active:scale-95 cursor-pointer" id="fabBtn" onclick="toggleChat()">
+<span class="material-symbols-outlined text-[28px]" style="font-variation-settings: 'FILL' 1;">forum</span>
+</button>
+</div>
+<script>
+        const chatWindow = document.getElementById('chatWindow');
+        const fabBtn = document.getElementById('fabBtn');
+        const typingIndicator = document.getElementById('typing');
+        const sendBtn = document.getElementById('sendBtn');
+
+        function toggleChat() {
+            if (chatWindow.classList.contains('hidden')) {
+                chatWindow.classList.remove('hidden');
+                setTimeout(() => {
+                    chatWindow.classList.remove('scale-0', 'opacity-0');
+                    chatWindow.classList.add('scale-100', 'opacity-100');
+                }, 10);
+                fabBtn.classList.add('hidden');
+            } else {
+                chatWindow.classList.add('scale-0', 'opacity-0');
+                setTimeout(() => {
+                    chatWindow.classList.add('hidden');
+                    fabBtn.classList.remove('hidden');
+                }, 300);
+            }
+        }
+
+        sendBtn.addEventListener('click', () => {
+            const input = document.querySelector('input');
+            if(input.value.trim() !== '') {
+                // Simulate message sending
+                input.value = '';
+                typingIndicator.classList.remove('hidden');
+                
+                // Scroll to bottom
+                const container = chatWindow.querySelector('.overflow-y-auto');
+                container.scrollTop = container.scrollHeight;
+
+                setTimeout(() => {
+                    typingIndicator.classList.add('hidden');
+                }, 2000);
+            }
+        });
+
+        // Add visual flair to action chips
+        document.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('click', function() {
+                if (this.innerText === "Tuition Fees") {
+                    typingIndicator.classList.remove('hidden');
+                    setTimeout(() => typingIndicator.classList.add('hidden'), 1500);
+                }
+            });
+        });
+    </script>
+</body></html>

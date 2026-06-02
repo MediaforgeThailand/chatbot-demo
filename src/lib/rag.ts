@@ -134,8 +134,22 @@ export async function answerQuestion(
     };
   }
 
-  const config = getRagConfig();
   const dateContext = getDateContext(new Date());
+  const clarificationAnswer = buildClarificationAnswer(
+    question,
+    history,
+    memory,
+    dateContext,
+  );
+
+  if (clarificationAnswer) {
+    return {
+      answer: clarificationAnswer,
+      sources: [],
+    };
+  }
+
+  const config = getRagConfig();
   const queryUnderstanding = await understandQuestion(
     question,
     history,
@@ -143,7 +157,14 @@ export async function answerQuestion(
     dateContext,
     config,
   );
+  const deterministicStandaloneQuestion = buildDeterministicStandaloneQuestion(
+    question,
+    history,
+    memory,
+    dateContext,
+  );
   const standaloneQuestion =
+    deterministicStandaloneQuestion ||
     queryUnderstanding?.standaloneQuestion ||
     (await buildStandaloneQuestion(question, history, memory, dateContext, config));
   const groundedQuestion = addRelativeDateContext(standaloneQuestion, dateContext);
@@ -1153,8 +1174,10 @@ Classify scope carefully:
 Interpret ambiguous Thai naturally:
 - "เมื่อ", "ที่ผ่านมา", "ที่แล้ว", "ก่อน", "รอบก่อน" usually mean the nearest past matching date/month unless conversation history says otherwise.
 - "นี้", "ตอนนี้", "ปัจจุบัน", "ล่าสุด" usually mean the current or most recent relevant period.
+- For short date follow-ups, "13 นี้หละ" or "วันที่ 13 นี้" means day 13 of the current Thailand month/year.
 - "หน้า", "ถัดไป", "ที่จะถึง" usually mean the nearest future matching period.
 - Short follow-ups such as "13 หละ", "แล้ววันที่ 4", "เดือนนั้น", "วันนั้น" must use the conversation history.
+- Short date questions with a day number but no month/year, such as "วันที่ 5 มีอะไร", are ambiguous if conversation history or MEMORY does not clearly point to a calendar month. Prefer asking for the month/year instead of guessing.
 - If the user writes a number followed by "พฤ" exactly, treat it as a likely typo for พ.ค. (May). If they write "พฤหัส" or "พฤหัสบดี", treat it as Thursday.
 - Choose the best interpretation when context strongly points to one. Ask for clarification only if no reasonable best choice exists.
 - Use MEMORY as a correction preference. If MEMORY says the user corrected a calendar year/month, apply it to later ambiguous month follow-ups unless the latest question explicitly gives another year/month.
@@ -2042,6 +2065,52 @@ function buildSingleCalendarEventSentence(dateText: string, event: string): stri
   return `วันที่ ${dateText} มีกิจกรรม/กำหนดการ: ${event} ครับ`;
 }
 
+function buildClarificationAnswer(
+  question: string,
+  history: ConversationMessage[],
+  memory: ConversationMemory,
+  dateContext: DateContext,
+): string | null {
+  const shortDay = extractShortDayReference(question);
+
+  if (
+    shortDay !== null &&
+    isShortCalendarDateQuestion(question, history) &&
+    !hasExplicitCalendarDateContext(question) &&
+    !hasCurrentMonthDateCue(question) &&
+    shouldAskForShortDateMonthConfirmation(question, history)
+  ) {
+    return `หมายถึงวันที่ ${shortDay} ของเดือนไหนครับ พิมพ์เดือน/ปีเพิ่มอีกนิดได้เลย เช่น "${shortDay} มิถุนายน 2569" หรือถ้าหมายถึงเดือนนี้ให้ตอบว่า "เดือนนี้"`;
+  }
+
+  if (
+    shortDay !== null &&
+    isShortCalendarDateQuestion(question, history) &&
+    !hasExplicitCalendarDateContext(question) &&
+    !hasCurrentMonthDateCue(question) &&
+    !getCalendarBaseMonthKey(history, memory)
+  ) {
+    const currentMonthText = formatThaiMonthKey(dateContext.todayKey.slice(0, 7));
+
+    return `หมายถึงวันที่ ${shortDay} ของเดือนไหนครับ ถ้าหมายถึงเดือนนี้คือ ${shortDay} ${currentMonthText} หรือพิมพ์เดือน/ปีมาได้เลย เช่น "${shortDay} มิถุนายน 2569"`;
+  }
+
+  if (
+    hasAmbiguousCalendarReference(question) &&
+    !findLatestDateKey(history) &&
+    !findLatestMonthKey(history) &&
+    !getCalendarBaseMonthKey(history, memory)
+  ) {
+    return "หมายถึงวันหรือเดือนช่วงไหนครับ พิมพ์วันที่/เดือนให้ชัดอีกนิดได้เลย เช่น \"5 มิถุนายน 2569\" หรือ \"เดือนมิถุนายน 2569\"";
+  }
+
+  if (isBareAmbiguousFollowUp(question) && history.length === 0) {
+    return "ขอรายละเอียดเพิ่มอีกนิดครับ หมายถึงเรื่องสมัครเรียน ค่าเทอม หลักสูตร ปฏิทินกิจกรรม หรือเรื่องอื่นของวิทยาลัยครับ";
+  }
+
+  return null;
+}
+
 async function buildStandaloneQuestion(
   question: string,
   history: ConversationMessage[],
@@ -2049,27 +2118,15 @@ async function buildStandaloneQuestion(
   dateContext: DateContext,
   config: RagConfig,
 ): Promise<string> {
-  const relativeDateQuestion = contextualizeRelativeDateQuestion(question, dateContext);
-
-  if (relativeDateQuestion) {
-    return relativeDateQuestion;
-  }
-
-  const monthQuestion = contextualizeMonthQuestion(
+  const deterministicQuestion = buildDeterministicStandaloneQuestion(
     question,
     history,
     memory,
     dateContext,
   );
 
-  if (monthQuestion) {
-    return monthQuestion;
-  }
-
-  const dateQuestion = contextualizeDateQuestion(question, history, dateContext);
-
-  if (dateQuestion) {
-    return dateQuestion;
+  if (deterministicQuestion) {
+    return deterministicQuestion;
   }
 
   if (history.length === 0 || !isLikelyFollowUpQuestion(question)) {
@@ -2089,6 +2146,53 @@ async function buildStandaloneQuestion(
   } catch {
     return question;
   }
+}
+
+function buildDeterministicStandaloneQuestion(
+  question: string,
+  history: ConversationMessage[],
+  memory: ConversationMemory,
+  dateContext: DateContext,
+): string | null {
+  return (
+    contextualizeClarifiedDateQuestion(question, history, memory, dateContext) ??
+    contextualizeRelativeDateQuestion(question, dateContext) ??
+    contextualizeMonthQuestion(question, history, memory, dateContext) ??
+    contextualizeDateQuestion(question, history, memory, dateContext)
+  );
+}
+
+function contextualizeClarifiedDateQuestion(
+  question: string,
+  history: ConversationMessage[],
+  memory: ConversationMemory,
+  dateContext: DateContext,
+): string | null {
+  const pendingDay = findPendingDateClarificationDay(history);
+
+  if (!pendingDay) {
+    return null;
+  }
+
+  const normalizedQuestion = question
+    .replace(/[?？!！.。]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+  const monthKey = /^(?:ใช่|ใช่ครับ|ใช่ค่ะ|ครับ|ค่ะ|นี้|นี่|เอาเดือนนี้|เดือนนี้|เดือนปัจจุบัน)$/.test(
+    normalizedQuestion,
+  )
+    ? dateContext.todayKey.slice(0, 7)
+    : extractTargetMonthKey(question, dateContext, history, memory);
+
+  if (!monthKey) {
+    return null;
+  }
+
+  const [year, month] = monthKey.split("-");
+  const dateKey = `${year}-${month}-${String(pendingDay).padStart(2, "0")}`;
+
+  return `วันที่ ${formatThaiDateKey(dateKey)} (${dateKey}) มีกิจกรรมอะไร`;
 }
 
 function contextualizeRelativeDateQuestion(
@@ -2136,6 +2240,7 @@ function contextualizeMonthQuestion(
 function contextualizeDateQuestion(
   question: string,
   history: ConversationMessage[],
+  memory: ConversationMemory,
   dateContext: DateContext,
 ): string | null {
   if (
@@ -2145,7 +2250,11 @@ function contextualizeDateQuestion(
   ) {
     const partialThaiDateKey = extractPartialThaiDateKey(question, history, dateContext);
 
-    if (partialThaiDateKey && isCalendarFollowUp(question, history)) {
+    if (
+      partialThaiDateKey &&
+      (isCalendarFollowUp(question, history) ||
+        isStandaloneCalendarDateQuestion(question))
+    ) {
       return `วันที่ ${formatThaiDateKey(
         partialThaiDateKey,
       )} (${partialThaiDateKey}) มีกิจกรรมอะไร`;
@@ -2156,15 +2265,153 @@ function contextualizeDateQuestion(
 
   const day = extractShortDayReference(question);
 
-  if (!day || !isCalendarFollowUp(question, history)) {
+  if (
+    !day ||
+    !isShortCalendarDateQuestion(question, history)
+  ) {
     return null;
   }
 
-  const baseDateKey = findLatestDateKey(history) ?? dateContext.todayKey;
-  const [year, month] = baseDateKey.split("-");
+  const baseMonthKey =
+    getShortDateBaseMonthKey(question, history, memory, dateContext) ??
+    dateContext.todayKey.slice(0, 7);
+  const [year, month] = baseMonthKey.split("-");
   const dateKey = `${year}-${month}-${String(day).padStart(2, "0")}`;
 
   return `วันที่ ${formatThaiDateKey(dateKey)} (${dateKey}) มีกิจกรรมอะไร`;
+}
+
+function isStandaloneCalendarDateQuestion(question: string): boolean {
+  return (
+    /(?:วันที่|วัน|มีอะไร|อะไร|กิจกรรม|งาน|ปฏิทิน|กำหนดการ|วันหยุด)/.test(
+      question,
+    ) && extractShortDayReference(question) !== null
+  );
+}
+
+function isShortCalendarDateQuestion(
+  question: string,
+  history: ConversationMessage[],
+): boolean {
+  return (
+    isStandaloneCalendarDateQuestion(question) ||
+    isCalendarFollowUp(question, history) ||
+    (extractShortDayReference(question) !== null &&
+      /(?:นั้น|นั่น|หละ|ล่ะ|ละ|แล้ว)/.test(question))
+  );
+}
+
+function hasExplicitCalendarDateContext(question: string): boolean {
+  return (
+    extractTargetDateKeys(question).length > 0 ||
+    containsThaiMonth(question) ||
+    hasDayMonthReference(question) ||
+    /\b20\d{2}-\d{2}-\d{2}\b/.test(question)
+  );
+}
+
+function hasAmbiguousCalendarReference(question: string): boolean {
+  return /(?:วันนั้น|วันดังกล่าว|เดือนนั้น|เดือนดังกล่าว|ช่วงนั้น|ตอนนั้น)/.test(
+    question,
+  );
+}
+
+function hasCurrentMonthDateCue(question: string): boolean {
+  return /(?:เดือนนี้|เดือนปัจจุบัน|เดือนล่าสุด|(?:^|\s)(?:นี้|นี่)(?:\s*(?:หละ|ล่ะ|ละ|แหละ))?(?=\s|$))/i.test(
+    question,
+  );
+}
+
+function isBareAmbiguousFollowUp(question: string): boolean {
+  const normalizedQuestion = question
+    .replace(/[?？!！.。]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (normalizedQuestion.length === 0 || normalizedQuestion.length > 24) {
+    return false;
+  }
+
+  return /^(?:อะไร|ยังไง|แบบไหน|ที่ไหน|เท่าไหร่|เมื่อไหร่|ใคร|อันไหน|ไหน|แล้ว|ต่อ|หละ|ล่ะ|ละ)$/.test(
+    normalizedQuestion,
+  );
+}
+
+function getCalendarBaseMonthKey(
+  history: ConversationMessage[],
+  memory: ConversationMemory,
+): string | null {
+  const latestDateKey = findLatestDateKey(history);
+
+  if (latestDateKey) {
+    return latestDateKey.slice(0, 7);
+  }
+
+  const latestMonthKey = findLatestMonthKey(history);
+
+  if (latestMonthKey) {
+    return latestMonthKey;
+  }
+
+  if (memory.calendarMonthKey && isValidMonthKey(memory.calendarMonthKey)) {
+    return memory.calendarMonthKey;
+  }
+
+  return null;
+}
+
+function getShortDateBaseMonthKey(
+  question: string,
+  history: ConversationMessage[],
+  memory: ConversationMemory,
+  dateContext: DateContext,
+): string | null {
+  if (hasCurrentMonthDateCue(question)) {
+    return dateContext.todayKey.slice(0, 7);
+  }
+
+  return getCalendarBaseMonthKey(history, memory);
+}
+
+function shouldAskForShortDateMonthConfirmation(
+  question: string,
+  history: ConversationMessage[],
+): boolean {
+  if (!/(?:นั้น|นั่น|นั้นละ|นั่นละ|นั้นแหละ|นั่นแหละ|อันนั้น|ที่ว่า)/.test(question)) {
+    return false;
+  }
+
+  const latestDateKey = findLatestDateKey(history);
+
+  if (!latestDateKey) {
+    return false;
+  }
+
+  const day = extractShortDayReference(question);
+  const latestDay = Number(latestDateKey.slice(-2));
+
+  return day !== null && day === latestDay;
+}
+
+function findPendingDateClarificationDay(
+  history: ConversationMessage[],
+): number | null {
+  for (const message of history.slice(-4).reverse()) {
+    if (message.role !== "assistant") {
+      continue;
+    }
+
+    const match = message.content.match(/หมายถึงวันที่\s*(\d{1,2})\s*ของเดือนไหน/);
+
+    if (!match) {
+      continue;
+    }
+
+    const day = Number(match[1]);
+    return day >= 1 && day <= 31 ? day : null;
+  }
+
+  return null;
 }
 
 function extractShortDayReference(question: string): number | null {
@@ -2403,8 +2650,10 @@ function shouldUseExactCalendarMonth(
 }
 
 function isCalendarDateQuestion(question: string): boolean {
-  return /(?:กิจกรรม|งาน|ปฏิทิน|กำหนดการ|วันหยุด|วันนี้|พรุ่งนี้|เมื่อวาน)/.test(
-    question,
+  return (
+    /(?:กิจกรรม|งาน|ปฏิทิน|กำหนดการ|วันหยุด|วันนี้|พรุ่งนี้|เมื่อวาน)/.test(
+      question,
+    ) || isStandaloneCalendarDateQuestion(question)
   );
 }
 

@@ -208,6 +208,7 @@ export function ChatDemo() {
             <Hero
               onAsk={(q) => void submitQuestion(q)}
               onSubmit={handleSubmit}
+              onSubmitQuestion={() => void submitQuestion()}
               question={question}
               onChange={setQuestion}
               canSubmit={canSubmit}
@@ -226,6 +227,7 @@ export function ChatDemo() {
           question={question}
           onChange={setQuestion}
           onSubmit={handleSubmit}
+          onSubmitQuestion={() => void submitQuestion()}
           onAsk={(q) => void submitQuestion(q)}
           canSubmit={canSubmit}
         />
@@ -567,12 +569,14 @@ function MobileTopBar({ onOpenNav }: { onOpenNav: () => void }) {
 function Hero({
   onAsk,
   onSubmit,
+  onSubmitQuestion,
   question,
   onChange,
   canSubmit,
 }: {
   onAsk: (question: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onSubmitQuestion: () => void;
   question: string;
   onChange: (value: string) => void;
   canSubmit: boolean;
@@ -605,6 +609,14 @@ function Hero({
           <input
             value={question}
             onChange={(event) => onChange(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key !== "Enter" || event.nativeEvent.isComposing) {
+                return;
+              }
+
+              event.preventDefault();
+              onSubmitQuestion();
+            }}
             className="flex-1 border-none bg-transparent py-4 text-body-md placeholder:text-on-surface-variant/40 focus:ring-0 focus:outline-none"
             placeholder="ถาม PSC AI..."
             type="text"
@@ -626,7 +638,8 @@ function Hero({
               <MIcon name="attach_file" />
             </button>
             <button
-              type="submit"
+              type="button"
+              onClick={onSubmitQuestion}
               disabled={!canSubmit}
               aria-label="ส่งคำถาม"
               className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-on-primary shadow-md transition-transform hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100"
@@ -808,6 +821,7 @@ function BottomBar({
   question,
   onChange,
   onSubmit,
+  onSubmitQuestion,
   onAsk,
   canSubmit,
 }: {
@@ -815,6 +829,7 @@ function BottomBar({
   question: string;
   onChange: (value: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onSubmitQuestion: () => void;
   onAsk: (question: string) => void;
   canSubmit: boolean;
 }) {
@@ -844,13 +859,22 @@ function BottomBar({
             <input
               value={question}
               onChange={(event) => onChange(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key !== "Enter" || event.nativeEvent.isComposing) {
+                  return;
+                }
+
+                event.preventDefault();
+                onSubmitQuestion();
+              }}
               className="flex-1 border-none bg-transparent text-body-md text-on-surface placeholder:text-on-surface-variant/50 focus:ring-0 focus:outline-none"
               placeholder="ถาม PSC AI ได้ทุกเรื่อง..."
               type="text"
               autoComplete="off"
             />
             <button
-              type="submit"
+              type="button"
+              onClick={onSubmitQuestion}
               disabled={!canSubmit}
               aria-label="ส่งคำถาม"
               className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-on-primary shadow-md transition-transform duration-150 hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100"
