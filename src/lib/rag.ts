@@ -170,7 +170,8 @@ export async function answerQuestion(
   const groundedQuestion = addRelativeDateContext(standaloneQuestion, dateContext);
   const understoodDateKey = getUnderstoodDateKey(queryUnderstanding);
   const understoodMonthKey = getUnderstoodMonthKey(queryUnderstanding);
-  const targetDateKey = understoodDateKey ?? extractTargetDateKeys(groundedQuestion)[0];
+  const deterministicDateKey = extractTargetDateKeys(groundedQuestion)[0];
+  const targetDateKey = deterministicDateKey ?? understoodDateKey;
   const originalMonthKey = extractTargetMonthKey(
     question,
     dateContext,
@@ -184,7 +185,7 @@ export async function answerQuestion(
     memory,
   );
   const targetMonthKey =
-    originalMonthKey ?? understoodMonthKey ?? groundedMonthKey;
+    groundedMonthKey ?? originalMonthKey ?? understoodMonthKey;
 
   if (shouldUseWebAnswer(question, history, queryUnderstanding)) {
     const answer = await generateWebGroundedAnswer(
