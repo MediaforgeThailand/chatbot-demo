@@ -751,13 +751,17 @@ function Conversation({
       )}
 
       {isLoading ? (
-        <div className="mt-2 flex items-center gap-3">
-          <span className="shimmer h-2 w-2 rounded-full" />
-          <span className="shimmer h-2 w-2 rounded-full" />
-          <span className="shimmer h-2 w-2 rounded-full" />
-          <span className="font-label-bold text-label-bold italic text-primary">
-            AI กำลังค้นเอกสาร...
-          </span>
+        <div className="animate-message-in flex max-w-[85%] flex-col items-start">
+          <div className="message-glow flex items-center gap-2.5 rounded-t-lg rounded-br-lg bg-surface-container-high px-5 py-4">
+            <span className="typing flex items-center gap-1" aria-hidden="true">
+              <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+              <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+              <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+            </span>
+            <span className="text-body-sm text-on-surface-variant">
+              กำลังเรียบเรียงคำตอบ
+            </span>
+          </div>
         </div>
       ) : null}
 

@@ -204,6 +204,29 @@
     }
   }
 
+  /* Minimal typing indicator: three dots in a soft staggered bounce. */
+  @keyframes dot-bounce {
+    0%,
+    80%,
+    100% {
+      transform: translateY(0);
+      opacity: 0.3;
+    }
+    40% {
+      transform: translateY(-3px);
+      opacity: 1;
+    }
+  }
+  .typing span {
+    animation: dot-bounce 1.2s var(--ease-out-quint) infinite;
+  }
+  .typing span:nth-child(2) {
+    animation-delay: 0.15s;
+  }
+  .typing span:nth-child(3) {
+    animation-delay: 0.3s;
+  }
+
   /* Message entrance, slide only (never opacity-gated). */
   @keyframes message-in {
     from {
@@ -234,7 +257,11 @@
   .ai-shimmer,
   .shimmer,
   .animate-message-in,
-  .rise-in {
+  .rise-in,
+  .typing span {
     animation: none;
+  }
+  .typing span {
+    opacity: 0.6;
   }
 }
