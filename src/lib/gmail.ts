@@ -15,6 +15,27 @@ export type GmailStatus = {
   scope?: string;
 };
 
+export type GmailMessageSummary = {
+  id: string;
+  threadId: string;
+  subject: string;
+  from: string;
+  to: string;
+  date: string;
+  snippet: string;
+  labelIds: string[];
+};
+
+export type GmailThreadMessage = GmailMessageSummary & {
+  body: string;
+};
+
+export type GmailThreadDetails = {
+  id: string;
+  historyId?: string;
+  messages: GmailThreadMessage[];
+};
+
 type GmailConfig = {
   googleClientId: string;
   googleClientSecret: string;
@@ -52,10 +73,14 @@ const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GOOGLE_REVOKE_URL = "https://oauth2.googleapis.com/revoke";
 const GMAIL_SEND_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages/send";
+const GMAIL_MESSAGES_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages";
+const GMAIL_THREADS_URL = "https://gmail.googleapis.com/gmail/v1/users/me/threads";
+const GEMINI_API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
 const GMAIL_SCOPES = [
   "openid",
   "email",
   "profile",
+  "https://www.googleapis.com/auth/gmail.readonly",
   "https://www.googleapis.com/auth/gmail.send",
 ];
 const OAUTH_STATE_MAX_AGE_MS = 10 * 60 * 1000;
@@ -440,6 +465,304 @@ export async function sendGmailMessage({
     threadId: data.threadId,
   };
 }
+
+export async function searchGmailMessages({
+  accessToken,
+  query,
+  maxResults = 10,
+}: {
+  accessToken: string;
+  query: string;
+  maxResults?: number;
+}): Promise<GmailMessageSummary[]> {
+  const params = new URLSearchParams({
+    maxResults: String(Math.min(Math.max(maxResults, 1), 20)),
+    q: query.trim() || "in:inbox newer_than:30d",
+  });
+  const response = await fetch(`${GMAIL_MESSAGES_URL}?${params.toString()}`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+    cache: "no-store",
+  });
+  const data = (await response.json().catch(() => ({}))) as {
+    messages?: Array<{ id?: string; threadId?: string }>;
+    error?: { message?: string };
+  };
+
+  if (!response.ok) {
+    throw new GmailConnectionError(
+      data.error?.message ?? `Gmail message search failed: ${response.status}`,
+    );
+  }
+
+  const messages = data.messages ?? [];
+  const details = await Promise.all(
+    messages
+      .filter((message): message is { id: string; threadId: string } =>
+        Boolean(message.id && message.threadId),
+      )
+      .map((message) => getGmailMessageMetadata(accessToken, message.id)),
+  );
+
+  return details;
+}
+
+export async function getGmailThreadDetails({
+  accessToken,
+  threadId,
+}: {
+  accessToken: string;
+  threadId: string;
+}): Promise<GmailThreadDetails> {
+  if (!/^[A-Za-z0-9_-]+$/.test(threadId)) {
+    throw new GmailConnectionError("Gmail thread id is invalid");
+  }
+
+  const response = await fetch(
+    `${GMAIL_THREADS_URL}/${encodeURIComponent(threadId)}?format=full`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      cache: "no-store",
+    },
+  );
+  const data = (await response.json().catch(() => ({}))) as GmailThreadApiResponse & {
+    error?: { message?: string };
+  };
+
+  if (!response.ok) {
+    throw new GmailConnectionError(
+      data.error?.message ?? `Gmail thread request failed: ${response.status}`,
+    );
+  }
+
+  return {
+    id: data.id ?? threadId,
+    historyId: data.historyId,
+    messages: (data.messages ?? [])
+      .map(readThreadMessage)
+      .filter((message): message is GmailThreadMessage => message !== null),
+  };
+}
+
+export async function summarizeGmailThread({
+  thread,
+  userInstruction,
+}: {
+  thread: GmailThreadDetails;
+  userInstruction?: string;
+}): Promise<string> {
+  const geminiApiKey =
+    process.env.GEMINI_API_KEY ?? process.env.GOOGLE_GENERATIVE_AI_API_KEY ?? "";
+  const generationModel = process.env.GEMINI_GENERATION_MODEL || "gemini-3.5-flash";
+
+  if (!geminiApiKey) {
+    throw new GmailConfigurationError(["GEMINI_API_KEY"]);
+  }
+
+  const threadText = thread.messages
+    .map(
+      (message, index) => `MESSAGE ${index + 1}
+From: ${message.from || "-"}
+To: ${message.to || "-"}
+Date: ${message.date || "-"}
+Subject: ${message.subject || "-"}
+Snippet: ${message.snippet || "-"}
+Body:
+${message.body || "(empty)"}`,
+    )
+    .join("\n\n---\n\n")
+    .slice(0, 18000);
+  const prompt = `คุณคือผู้ช่วยอ่าน Gmail ให้ผู้ใช้
+สรุป thread อีเมลนี้เป็นภาษาไทย กระชับ อ่านง่าย และไม่เดาข้อมูลนอกอีเมล
+
+กติกา:
+- สรุปใจความสำคัญ 3-6 bullet
+- ระบุ action items ถ้ามี
+- ระบุคนที่เกี่ยวข้องและวันที่สำคัญถ้าพบ
+- ถ้าข้อมูลไม่พอ ให้บอกว่าไม่พบใน thread
+
+คำสั่งเพิ่มเติมจากผู้ใช้:
+${userInstruction?.trim() || "(ไม่มี)"}
+
+GMAIL THREAD:
+${threadText}`;
+  const response = await fetch(
+    `${GEMINI_API_BASE_URL}/models/${generationModel}:generateContent`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": geminiApiKey,
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: prompt }],
+          },
+        ],
+        generationConfig: {
+          temperature: 0.2,
+        },
+      }),
+      cache: "no-store",
+    },
+  );
+
+  if (!response.ok) {
+    throw new GmailConnectionError(`Gemini Gmail summary request failed: ${response.status}`);
+  }
+
+  const data = (await response.json()) as GeminiGenerateResponse;
+  const text =
+    data.candidates?.[0]?.content?.parts
+      ?.map((part) => part.text)
+      .filter(Boolean)
+      .join("\n")
+      .trim() ?? "";
+
+  return text || "ผมยังสรุป thread นี้ไม่ได้ครับ";
+}
+
+async function getGmailMessageMetadata(
+  accessToken: string,
+  messageId: string,
+): Promise<GmailMessageSummary> {
+  const params = new URLSearchParams({
+    format: "metadata",
+  });
+
+  for (const header of ["From", "To", "Subject", "Date"]) {
+    params.append("metadataHeaders", header);
+  }
+
+  const response = await fetch(
+    `${GMAIL_MESSAGES_URL}/${encodeURIComponent(messageId)}?${params.toString()}`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      cache: "no-store",
+    },
+  );
+  const data = (await response.json().catch(() => ({}))) as GmailMessageApiResponse & {
+    error?: { message?: string };
+  };
+
+  if (!response.ok) {
+    throw new GmailConnectionError(
+      data.error?.message ?? `Gmail message request failed: ${response.status}`,
+    );
+  }
+
+  return readMessageSummary(data);
+}
+
+function readThreadMessage(message: GmailMessageApiResponse): GmailThreadMessage | null {
+  if (!message.id || !message.threadId) {
+    return null;
+  }
+
+  return {
+    ...readMessageSummary(message),
+    body: extractMessageBody(message.payload).slice(0, 6000),
+  };
+}
+
+function readMessageSummary(message: GmailMessageApiResponse): GmailMessageSummary {
+  const headers = readHeaders(message.payload?.headers);
+
+  return {
+    id: message.id ?? "",
+    threadId: message.threadId ?? "",
+    subject: headers.Subject ?? "(ไม่มีหัวข้อ)",
+    from: headers.From ?? "",
+    to: headers.To ?? "",
+    date: headers.Date ?? "",
+    snippet: message.snippet ?? "",
+    labelIds: message.labelIds ?? [],
+  };
+}
+
+function readHeaders(
+  headers: Array<{ name?: string; value?: string }> | undefined,
+): Record<string, string> {
+  const result: Record<string, string> = {};
+
+  for (const header of headers ?? []) {
+    if (header.name && header.value) {
+      result[header.name] = header.value;
+    }
+  }
+
+  return result;
+}
+
+function extractMessageBody(payload: GmailMessagePayload | undefined): string {
+  if (!payload) {
+    return "";
+  }
+
+  if (payload.body?.data) {
+    return decodeGmailBody(payload.body.data);
+  }
+
+  const preferredParts = [...(payload.parts ?? [])].sort((first, second) => {
+    const firstScore = first.mimeType === "text/plain" ? 0 : 1;
+    const secondScore = second.mimeType === "text/plain" ? 0 : 1;
+    return firstScore - secondScore;
+  });
+
+  return preferredParts
+    .map((part) => extractMessageBody(part))
+    .filter(Boolean)
+    .join("\n")
+    .trim();
+}
+
+function decodeGmailBody(data: string): string {
+  try {
+    return Buffer.from(data, "base64url").toString("utf8").trim();
+  } catch {
+    return "";
+  }
+}
+
+type GmailThreadApiResponse = {
+  id?: string;
+  historyId?: string;
+  messages?: GmailMessageApiResponse[];
+};
+
+type GmailMessageApiResponse = {
+  id?: string;
+  threadId?: string;
+  labelIds?: string[];
+  snippet?: string;
+  payload?: GmailMessagePayload;
+};
+
+type GmailMessagePayload = {
+  mimeType?: string;
+  headers?: Array<{ name?: string; value?: string }>;
+  body?: {
+    data?: string;
+  };
+  parts?: GmailMessagePayload[];
+};
+
+type GeminiGenerateResponse = {
+  candidates?: Array<{
+    content?: {
+      parts?: Array<{
+        text?: string;
+      }>;
+    };
+  }>;
+};
 
 export function validateEmailInput({
   to,

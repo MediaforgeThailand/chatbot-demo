@@ -32,6 +32,17 @@ type GmailConnectorStatus = {
   error?: string;
 };
 
+type GmailMessageSummary = {
+  id: string;
+  threadId: string;
+  subject: string;
+  from: string;
+  to: string;
+  date: string;
+  snippet: string;
+  labelIds: string[];
+};
+
 const MAX_HISTORY_MESSAGES = 24;
 
 const starters = [
@@ -878,6 +889,8 @@ function ConnectorsModal({
                 onSent={onRefreshStatus}
               />
 
+              <GmailMailboxExplorer enabled={connected} />
+
               <section className="mt-6 grid gap-3 sm:grid-cols-2">
                 {[
                   ["verified_user", "OAuth จริง", "เก็บ token ใน Supabase แบบเข้ารหัส"],
@@ -1067,6 +1080,197 @@ function GmailSendTester({
           {isSending ? "กำลังส่ง" : "ส่งอีเมลทดสอบ"}
         </button>
       </form>
+    </section>
+  );
+}
+
+function GmailMailboxExplorer({ enabled }: { enabled: boolean }) {
+  const [query, setQuery] = useState("in:inbox newer_than:30d");
+  const [messages, setMessages] = useState<GmailMessageSummary[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [isSummarizingThreadId, setIsSummarizingThreadId] = useState<string | null>(
+    null,
+  );
+  const [summary, setSummary] = useState<string | null>(null);
+  const [mailError, setMailError] = useState<string | null>(null);
+
+  async function searchMessages(event?: FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
+
+    if (!enabled || isSearching) {
+      return;
+    }
+
+    setIsSearching(true);
+    setMailError(null);
+    setSummary(null);
+
+    try {
+      const params = new URLSearchParams({
+        q: query.trim() || "in:inbox newer_than:30d",
+        maxResults: "8",
+      });
+      const response = await fetch(`/api/gmail/messages?${params.toString()}`, {
+        cache: "no-store",
+      });
+      const data = (await response.json()) as {
+        messages?: GmailMessageSummary[];
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(data.error ?? "ค้นหาอีเมลไม่สำเร็จ");
+      }
+
+      setMessages(data.messages ?? []);
+    } catch (error) {
+      setMessages([]);
+      setMailError(error instanceof Error ? error.message : "ค้นหาอีเมลไม่สำเร็จ");
+    } finally {
+      setIsSearching(false);
+    }
+  }
+
+  async function summarizeThread(threadId: string) {
+    if (!enabled || isSummarizingThreadId) {
+      return;
+    }
+
+    setIsSummarizingThreadId(threadId);
+    setMailError(null);
+    setSummary(null);
+
+    try {
+      const response = await fetch(
+        `/api/gmail/threads/${encodeURIComponent(threadId)}/summary`,
+        {
+          cache: "no-store",
+        },
+      );
+      const data = (await response.json()) as {
+        summary?: string;
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(data.error ?? "สรุป thread ไม่สำเร็จ");
+      }
+
+      setSummary(data.summary ?? "ไม่พบข้อมูลสำหรับสรุปครับ");
+    } catch (error) {
+      setMailError(error instanceof Error ? error.message : "สรุป thread ไม่สำเร็จ");
+    } finally {
+      setIsSummarizingThreadId(null);
+    }
+  }
+
+  return (
+    <section className="mt-6 rounded-xl border border-surface-container bg-surface-container-low p-5">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h4 className="font-label-bold text-body-md text-on-surface">
+            อ่าน ค้นหา และสรุป Gmail
+          </h4>
+          <p className="mt-1 text-body-sm text-on-surface-variant">
+            ใช้ Gmail API อ่าน inbox/search จริง แล้วส่งเนื้อหา thread ให้ Gemini สรุป
+          </p>
+        </div>
+        <span
+          className={`w-fit rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wide ${
+            enabled
+              ? "bg-primary text-on-primary"
+              : "bg-surface-container-high text-on-surface-variant"
+          }`}
+        >
+          {enabled ? "Readonly ready" : "Connect first"}
+        </span>
+      </div>
+
+      <p className="mb-4 rounded-lg bg-surface-container-lowest px-4 py-3 text-body-sm text-on-surface-variant">
+        ถ้าเคยเชื่อม Gmail ก่อนเพิ่มระบบอ่านเมล ให้กดตัดการเชื่อมต่อแล้วเชื่อมใหม่
+        เพื่อขอสิทธิ์ `gmail.readonly`
+      </p>
+
+      <form onSubmit={searchMessages} className="flex flex-col gap-3 sm:flex-row">
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          disabled={!enabled || isSearching}
+          className="min-w-0 flex-1 rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-3 text-body-sm text-on-surface focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+          placeholder="เช่น from:someone@example.com newer_than:7d"
+        />
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setQuery("in:inbox newer_than:30d")}
+            disabled={!enabled || isSearching}
+            className="rounded-full border border-outline-variant bg-surface-container-lowest px-4 py-3 font-label-bold text-label-bold text-on-surface transition hover:bg-primary-fixed disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Inbox
+          </button>
+          <button
+            type="submit"
+            disabled={!enabled || isSearching}
+            className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-3 font-label-bold text-label-bold text-on-primary transition hover:bg-primary-container disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <MIcon name="search" />
+            {isSearching ? "กำลังค้น" : "ค้นเมล"}
+          </button>
+        </div>
+      </form>
+
+      {mailError ? (
+        <div className="mt-4 rounded-lg bg-error-container px-4 py-3 text-body-sm text-on-error-container">
+          {mailError}
+        </div>
+      ) : null}
+
+      {messages.length > 0 ? (
+        <div className="mt-4 space-y-3">
+          {messages.map((message) => (
+            <article
+              key={message.id}
+              className="rounded-lg border border-surface-container bg-surface-container-lowest p-4"
+            >
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <h5 className="truncate font-label-bold text-body-md text-on-surface">
+                    {message.subject}
+                  </h5>
+                  <p className="mt-1 truncate text-body-sm text-on-surface-variant">
+                    จาก {message.from || "-"}
+                  </p>
+                  <p className="mt-2 line-clamp-2 text-body-sm text-on-surface-variant">
+                    {message.snippet || "ไม่มี snippet"}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void summarizeThread(message.threadId)}
+                  disabled={!enabled || Boolean(isSummarizingThreadId)}
+                  className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full border border-primary/20 bg-primary-fixed px-4 py-2 font-label-bold text-label-bold text-primary transition hover:bg-primary-fixed-dim disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <MIcon name="summarize" />
+                  {isSummarizingThreadId === message.threadId
+                    ? "กำลังสรุป"
+                    : "สรุป thread"}
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : null}
+
+      {summary ? (
+        <div className="mt-4 rounded-lg border border-primary/20 bg-primary-fixed px-4 py-3">
+          <h5 className="mb-2 font-label-bold text-body-md text-primary">
+            สรุป thread
+          </h5>
+          <p className="whitespace-pre-wrap text-body-sm text-on-primary-fixed">
+            {summary}
+          </p>
+        </div>
+      ) : null}
     </section>
   );
 }

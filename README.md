@@ -151,10 +151,12 @@ http://127.0.0.1:3001/api/gmail/oauth/callback
 เปิดใช้งาน Gmail API และใช้ scope:
 
 ```text
-openid email profile https://www.googleapis.com/auth/gmail.send
+openid email profile https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send
 ```
 
 ถ้า OAuth consent screen ยังอยู่สถานะ Testing ให้เพิ่มอีเมลที่จะใช้ลองเชื่อมต่อไว้ใน Test users ของ Google Cloud ก่อน
+
+ถ้าเคยเชื่อม Gmail ก่อนเพิ่มสิทธิ์อ่านเมล ให้กดตัดการเชื่อมต่อแล้วเชื่อมใหม่ เพื่อให้ Google ออก token ที่มีทั้ง `gmail.readonly` และ `gmail.send`
 
 ### Environment variables
 
@@ -173,7 +175,7 @@ GMAIL_TOKEN_ENCRYPTION_KEY=...
 node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 ```
 
-ทดสอบได้ที่หน้า `Connectors` > `Gmail` > `เชื่อมต่อ` แล้วส่งอีเมลจากฟอร์มทดสอบใน modal
+ทดสอบได้ที่หน้า `Connectors` > `Gmail` > `เชื่อมต่อ` แล้วใช้ฟอร์มใน modal เพื่อส่งอีเมล ค้น inbox/search และสรุป thread
 
 ## API Flow
 
