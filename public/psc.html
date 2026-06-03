@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MediaForge · PSC College AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --indigo:#6366F1; --violet:#8B5CF6; --magenta:#EC4899; --cyan:#22D3EE; --sky:#38BDF8;
+  --psc:#E6128C; --psc2:#FF4FB0; --pscbg:#FCE7F3;
+  --line-green:#06C755;
+  --ink:#070A18; --muted:#9AA3C7; --line:rgba(255,255,255,.10);
+  --grad:linear-gradient(120deg,#6366F1 0%,#8B5CF6 50%,#EC4899 100%);
+  --grad2:linear-gradient(120deg,#22D3EE 0%,#6366F1 100%);
+  --pscgrad:linear-gradient(120deg,#E6128C 0%,#FF4FB0 100%);
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;background:#000;font-family:'IBM Plex Sans Thai','Kanit',sans-serif;overflow:hidden;}
+.kanit{font-family:'Kanit',sans-serif;}
+#viewport{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:radial-gradient(1200px 800px at 70% -10%,#15183a 0%,#070A18 55%);}
+#stage{position:relative;width:1280px;height:720px;transform-origin:center center;background:#070A18;overflow:hidden;}
+
+.slide{position:absolute;inset:0;opacity:0;visibility:hidden;transition:opacity .6s ease, visibility .6s;color:#fff;}
+.slide.active{opacity:1;visibility:visible;}
+.pad{position:absolute;inset:0;padding:66px 84px;display:flex;flex-direction:column;}
+.gt{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;}
+.gt2{background:var(--grad2);-webkit-background-clip:text;background-clip:text;color:transparent;}
+.kicker{font-family:'Kanit';font-weight:600;font-size:17px;letter-spacing:6px;text-transform:uppercase;color:#8FE6F2;}
+h1{font-family:'Kanit';font-weight:700;letter-spacing:-.5px;line-height:1.05;}
+h2{font-family:'Kanit';font-weight:600;font-size:52px;line-height:1.1;letter-spacing:-.3px;}
+.muted{color:var(--muted);font-weight:400;}
+
+.r{opacity:0;transform:translateY(26px);}
+.slide.active .r{animation:rise .7s cubic-bezier(.2,.7,.2,1) forwards;animation-delay:var(--d,0s);}
+@keyframes rise{to{opacity:1;transform:none;}}
+.pop{opacity:0;transform:scale(.8);}
+.slide.active .pop{animation:pop .6s cubic-bezier(.2,.9,.3,1.2) forwards;animation-delay:var(--d,0s);}
+@keyframes pop{to{opacity:1;transform:scale(1);}}
+
+@keyframes floatY{0%,100%{transform:translateY(0)}50%{transform:translateY(-14px)}}
+@keyframes floatY2{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes spinrev{to{transform:rotate(-360deg)}}
+@keyframes gshift{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+@keyframes flow{0%{transform:translateX(-46px);opacity:0}15%{opacity:1}85%{opacity:1}100%{transform:translateX(46px);opacity:0}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+@keyframes drift{0%{transform:translate(0,0)}50%{transform:translate(20px,-24px)}100%{transform:translate(0,0)}}
+@keyframes livepulse{0%,100%{box-shadow:0 0 0 0 rgba(230,18,140,.5)}70%{box-shadow:0 0 0 10px rgba(230,18,140,0)}}
+@keyframes typing{0%,60%,100%{transform:translateY(0);opacity:.4}30%{transform:translateY(-5px);opacity:1}}
+
+.glass{background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:22px;backdrop-filter:blur(6px);}
+.badge{width:74px;height:74px;border-radius:20px;display:flex;align-items:center;justify-content:center;}
+.particles span{position:absolute;border-radius:50%;background:var(--grad);opacity:.5;filter:blur(1px);}
+.orb{position:absolute;border-radius:50%;filter:blur(60px);background:conic-gradient(from 120deg,#6366F1,#EC4899,#22D3EE,#6366F1);}
+
+/* ---- product mockup chrome ---- */
+.browser{background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 40px 90px -30px rgba(0,0,0,.7);color:#1b2030;}
+.bbar{height:36px;background:#EFEFF3;display:flex;align-items:center;gap:7px;padding:0 14px;}
+.tdot{width:11px;height:11px;border-radius:50%;}
+.burl{margin-left:14px;background:#fff;border-radius:7px;height:20px;flex:1;max-width:280px;font-size:11px;color:#8a90a0;display:flex;align-items:center;padding:0 10px;font-family:'Kanit';}
+.phone{border:11px solid #15121c;border-radius:42px;background:#fff;overflow:hidden;box-shadow:0 40px 90px -28px rgba(0,0,0,.75);position:relative;color:#1b2030;}
+.phone .notch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:120px;height:22px;background:#15121c;border-radius:0 0 16px 16px;z-index:5;}
+.psclogo{background:var(--pscgrad);color:#fff;font-family:'Kanit';font-weight:700;border-radius:50%;display:flex;align-items:center;justify-content:center;}
+
+#bar{position:fixed;top:0;left:0;height:3px;background:var(--grad);z-index:60;transition:width .5s ease;}
+#ui{position:fixed;left:0;right:0;bottom:20px;display:flex;align-items:center;justify-content:center;gap:18px;z-index:50;}
+.dotnav{display:flex;gap:9px;}
+.dotnav b{width:9px;height:9px;border-radius:50%;background:rgba(255,255,255,.25);cursor:pointer;transition:.3s;}
+.dotnav b.on{background:#fff;width:26px;border-radius:5px;}
+.navbtn{width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:#fff;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.2s;}
+.navbtn:hover{background:rgba(255,255,255,.15);}
+.hint{position:fixed;top:16px;right:20px;color:#5d6488;font-size:12px;font-family:'Kanit';letter-spacing:.5px;z-index:50;}
+.logo-min{position:fixed;top:14px;left:22px;display:flex;align-items:center;gap:9px;color:#fff;font-family:'Kanit';font-weight:600;font-size:14px;letter-spacing:.5px;z-index:50;opacity:.85;}
+.logo-min i{width:22px;height:22px;border-radius:7px;background:var(--grad);display:inline-block;}
+.pageno{position:absolute;right:84px;bottom:30px;font-family:'Kanit';font-size:13px;color:#5d6488;letter-spacing:1px;}
+.orbit{position:absolute;}
+.ch{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:14px;padding:11px 16px;white-space:nowrap;}
+.ch b{font-family:'Kanit';font-weight:500;font-size:17px;}
+.cd{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+<div class="logo-min"><i></i> MediaForge × PSC</div>
+<div class="hint kanit">◀ ▶ เลื่อนสไลด์</div>
+
+<div id="viewport"><div id="stage">
+
+  <!-- ===== 1 COVER ===== -->
+  <section class="slide" data-i="0">
+    <div class="orb" style="width:560px;height:560px;right:-150px;top:-160px;opacity:.5;animation:spin 40s linear infinite;"></div>
+    <div class="orb" style="width:300px;height:300px;left:-120px;bottom:-120px;background:radial-gradient(circle,#22D3EE,transparent 70%);opacity:.4;animation:floatY 7s ease-in-out infinite;"></div>
+    <div class="particles">
+      <span style="width:10px;height:10px;left:62%;top:30%;animation:drift 9s ease-in-out infinite"></span>
+      <span style="width:7px;height:7px;left:78%;top:64%;animation:drift 11s ease-in-out infinite"></span>
+      <span style="width:14px;height:14px;left:46%;top:74%;animation:floatY 8s ease-in-out infinite"></span>
+    </div>
+    <div class="pad" style="justify-content:center;">
+      <div class="kicker r" style="--d:.1s">PSC&nbsp;COLLEGE&nbsp;AI</div>
+      <h1 class="r" style="--d:.25s;font-size:84px;max-width:900px;margin-top:22px;">ผู้ช่วย AI<br>ประจำวิทยาลัย</h1>
+      <h1 class="r gt2" style="--d:.4s;font-size:84px;">ตอบแม่นยำ 100%</h1>
+      <div class="r" style="--d:.6s;display:flex;gap:12px;margin-top:38px;">
+        <span class="glass" style="padding:10px 20px;border-radius:999px;font-family:'Kanit';font-weight:500;">🎯 แม่นยำ</span>
+        <span class="glass" style="padding:10px 20px;border-radius:999px;font-family:'Kanit';font-weight:500;">⚡ Real-time</span>
+        <span class="glass" style="padding:10px 20px;border-radius:999px;font-family:'Kanit';font-weight:500;">🌐 ทุกช่องทาง</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 2 PROBLEM ===== -->
+  <section class="slide" data-i="1">
+    <div class="pad">
+      <div class="kicker r">ปัญหาวันนี้</div>
+      <h2 class="r" style="--d:.1s;margin-top:14px;max-width:760px;">หาข้อมูลก็ยาก<br>ถาม AI ก็<span class="gt">ตอบมั่ว</span></h2>
+      <div style="flex:1;display:flex;align-items:center;justify-content:center;gap:40px;">
+        <div class="glass pop" style="--d:.25s;width:300px;padding:40px 30px;text-align:center;">
+          <div class="badge" style="margin:0 auto;background:rgba(236,72,153,.16);animation:floatY 5s ease-in-out infinite;">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="#EC4899" stroke-width="2.2"/><path d="M16 16l5 5" stroke="#EC4899" stroke-width="2.2" stroke-linecap="round"/></svg></div>
+          <div class="kanit" style="font-weight:600;font-size:24px;margin-top:22px;">หาข้อมูลไม่เจอ</div>
+        </div>
+        <div class="glass pop" style="--d:.45s;width:300px;padding:40px 30px;text-align:center;">
+          <div class="badge" style="margin:0 auto;background:rgba(245,158,11,.16);animation:floatY 5s ease-in-out infinite .6s;">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none"><path d="M12 3l9 16H3z" stroke="#F59E0B" stroke-width="2.2" stroke-linejoin="round"/><path d="M12 9v4" stroke="#F59E0B" stroke-width="2.2" stroke-linecap="round"/><circle cx="12" cy="16" r="1.3" fill="#F59E0B"/></svg></div>
+          <div class="kanit" style="font-weight:600;font-size:24px;margin-top:22px;">AI ทั่วไปตอบมั่ว</div>
+        </div>
+        <div class="glass pop" style="--d:.65s;width:300px;padding:40px 30px;text-align:center;">
+          <div class="badge" style="margin:0 auto;background:rgba(99,102,241,.16);animation:floatY 5s ease-in-out infinite 1.2s;">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#818CF8" stroke-width="2.2"/><path d="M12 7v5l3 3" stroke="#818CF8" stroke-width="2.2" stroke-linecap="round"/></svg></div>
+          <div class="kanit" style="font-weight:600;font-size:24px;margin-top:22px;">เจ้าหน้าที่งานล้น</div>
+        </div>
+      </div>
+    </div>
+    <div class="pageno kanit">02</div>
+  </section>
+
+  <!-- ===== 3 SOLUTION ===== -->
+  <section class="slide" data-i="2">
+    <div class="orb" style="width:420px;height:420px;left:-140px;bottom:-160px;opacity:.35;animation:spin 50s linear infinite;"></div>
+    <div class="pad" style="justify-content:center;">
+      <div class="kicker r">โซลูชัน</div>
+      <h2 class="r" style="--d:.1s;margin-top:14px;max-width:880px;">แชต AI ที่<span class="gt2">รู้จักวิทยาลัย</span><br>ของคุณ 100%</h2>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-top:48px;">
+        <div class="glass pop" style="--d:.3s;padding:30px 22px;"><div style="font-size:38px;animation:floatY 4s ease-in-out infinite;">🎯</div><div class="kanit" style="font-weight:600;font-size:21px;margin-top:16px;">แม่นยำ</div></div>
+        <div class="glass pop" style="--d:.45s;padding:30px 22px;"><div style="font-size:38px;animation:floatY 4s ease-in-out infinite .4s;">🧠</div><div class="kanit" style="font-weight:600;font-size:21px;margin-top:16px;">AI ระดับโลก</div></div>
+        <div class="glass pop" style="--d:.6s;padding:30px 22px;"><div style="font-size:38px;animation:floatY 4s ease-in-out infinite .8s;">⚡</div><div class="kanit" style="font-weight:600;font-size:21px;margin-top:16px;">Real-time</div></div>
+        <div class="glass pop" style="--d:.75s;padding:30px 22px;"><div style="font-size:38px;animation:floatY 4s ease-in-out infinite 1.2s;">🌐</div><div class="kanit" style="font-weight:600;font-size:21px;margin-top:16px;">ทุกช่องทาง</div></div>
+      </div>
+    </div>
+    <div class="pageno kanit">03</div>
+  </section>
+
+  <!-- ===== 4 RAG + REALTIME ===== -->
+  <section class="slide" data-i="3">
+    <div class="pad">
+      <div class="kicker r">ข้อมูลสด</div>
+      <h2 class="r" style="--d:.1s;margin-top:14px;">อัปเดตปุ๊บ <span class="gt2">รู้ปั๊บ</span></h2>
+      <div style="flex:1;display:flex;align-items:center;justify-content:center;">
+        <div style="display:flex;align-items:center;">
+          <div class="pop" style="--d:.25s;text-align:center;width:170px;"><div class="badge" style="margin:0 auto;width:92px;height:92px;background:rgba(99,102,241,.16);"><svg width="42" height="42" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="13" rx="2" stroke="#818CF8" stroke-width="2"/><path d="M8 20h8M12 17v3" stroke="#818CF8" stroke-width="2" stroke-linecap="round"/></svg></div><div class="kanit" style="font-weight:600;font-size:19px;margin-top:14px;">ฝ่าย PR อัปเดต</div></div>
+          <div style="position:relative;width:64px;height:4px;background:rgba(255,255,255,.12);border-radius:2px;"><span style="position:absolute;top:-3px;left:0;width:10px;height:10px;border-radius:50%;background:var(--cyan);box-shadow:0 0 12px #22D3EE;animation:flow 1.8s linear infinite;"></span></div>
+          <div class="pop" style="--d:.4s;text-align:center;width:170px;"><div class="badge" style="margin:0 auto;width:92px;height:92px;background:rgba(34,211,238,.14);"><svg width="42" height="42" viewBox="0 0 24 24" fill="none"><path d="M12 3v4M12 17v4M3 12h4M17 12h4" stroke="#22D3EE" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="4" stroke="#22D3EE" stroke-width="2"/></svg></div><div class="kanit" style="font-weight:600;font-size:19px;margin-top:14px;">จัดเก็บทันที</div></div>
+          <div style="position:relative;width:64px;height:4px;background:rgba(255,255,255,.12);border-radius:2px;"><span style="position:absolute;top:-3px;left:0;width:10px;height:10px;border-radius:50%;background:var(--cyan);box-shadow:0 0 12px #22D3EE;animation:flow 1.8s linear infinite .4s;"></span></div>
+          <div class="pop" style="--d:.55s;text-align:center;width:170px;"><div class="badge" style="margin:0 auto;width:92px;height:92px;background:linear-gradient(135deg,#6366F1,#8B5CF6);box-shadow:0 16px 36px -12px rgba(124,58,237,.7);animation:floatY 4s ease-in-out infinite;"><svg width="44" height="44" viewBox="0 0 24 24" fill="none"><path d="M4 7l8-4 8 4-8 4-8-4z" fill="#fff"/><path d="M4 7v6l8 4 8-4V7" stroke="#fff" stroke-width="1.7" opacity=".8"/></svg></div><div class="kanit" style="font-weight:600;font-size:19px;margin-top:14px;">AI ค้นหา</div></div>
+          <div style="position:relative;width:64px;height:4px;background:rgba(255,255,255,.12);border-radius:2px;"><span style="position:absolute;top:-3px;left:0;width:10px;height:10px;border-radius:50%;background:#34D399;box-shadow:0 0 12px #34D399;animation:flow 1.8s linear infinite .8s;"></span></div>
+          <div class="pop" style="--d:.7s;text-align:center;width:170px;"><div class="badge" style="margin:0 auto;width:92px;height:92px;background:rgba(52,211,153,.16);"><svg width="44" height="44" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5 9-11" stroke="#34D399" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="kanit" style="font-weight:600;font-size:19px;margin-top:14px;">ตอบถูกต้อง</div></div>
+        </div>
+      </div>
+      <div class="r muted kanit" style="--d:.9s;text-align:center;font-size:18px;margin-bottom:8px;">ฝ่ายประชาสัมพันธ์โพสต์ลง Social / LINE — AI เก็บเข้าฐานความรู้ทันที</div>
+    </div>
+    <div class="pageno kanit">04</div>
+  </section>
+
+  <!-- ===== 5 OMNICHANNEL ===== -->
+  <section class="slide" data-i="4">
+    <div class="pad">
+      <div class="kicker r">อยู่ได้ทุกที่</div>
+      <h2 class="r" style="--d:.1s;margin-top:14px;">AI ตัวเดียว <span class="gt2">วางได้ทุกช่องทาง</span></h2>
+      <div style="flex:1;display:flex;align-items:center;justify-content:center;">
+        <div style="position:relative;width:560px;height:420px;">
+          <div style="position:absolute;inset:60px;border:1px dashed rgba(255,255,255,.16);border-radius:50%;animation:spin 60s linear infinite;"></div>
+          <div style="position:absolute;inset:120px;border:1px dashed rgba(255,255,255,.12);border-radius:50%;animation:spinrev 45s linear infinite;"></div>
+          <div class="pop" style="--d:.3s;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:150px;height:150px;border-radius:38px;background:var(--grad);background-size:200% 200%;animation:gshift 6s ease infinite;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 24px 50px -16px rgba(124,58,237,.8);">
+            <svg width="46" height="46" viewBox="0 0 24 24" fill="none"><path d="M4 7l8-4 8 4-8 4-8-4z" fill="#fff"/><path d="M4 7v6l8 4 8-4V7" stroke="#fff" stroke-width="1.7" opacity=".8"/></svg>
+            <div class="kanit" style="font-weight:600;font-size:15px;margin-top:6px;">PSC AI</div></div>
+          <div class="orbit pop" style="--d:.5s;left:50%;top:8px;transform:translateX(-50%);"><div class="ch"><span class="cd" style="background:rgba(99,102,241,.2);">🌐</span><b>เว็บไซต์</b></div></div>
+          <div class="orbit pop" style="--d:.62s;right:8px;top:50%;transform:translateY(-50%);"><div class="ch"><span class="cd" style="background:rgba(6,199,85,.2);">💬</span><b>LINE OA</b></div></div>
+          <div class="orbit pop" style="--d:.74s;left:50%;bottom:8px;transform:translateX(-50%);"><div class="ch"><span class="cd" style="background:rgba(6,199,85,.2);">👨‍👩‍👧</span><b>กลุ่มผู้ปกครอง</b></div></div>
+          <div class="orbit pop" style="--d:.86s;left:8px;top:50%;transform:translateY(-50%);"><div class="ch"><span class="cd" style="background:rgba(139,92,246,.2);">📱</span><b>แอปนักเรียน</b></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="pageno kanit">05</div>
+  </section>
+
+  <!-- ===== 6 PRODUCT: WEB / PORTAL ===== -->
+  <section class="slide" data-i="5">
+    <div class="pad">
+      <div class="kicker r">หน้าตาใช้งานจริง</div>
+      <h2 class="r" style="--d:.1s;margin-top:12px;">บนเว็บ & พอร์ทัลนักเรียน</h2>
+      <div style="flex:1;position:relative;">
+        <!-- desktop portal -->
+        <div class="r" style="--d:.3s;position:absolute;left:0;top:18px;width:760px;">
+          <div class="browser" style="animation:floatY2 7s ease-in-out infinite;">
+            <div class="bbar"><span class="tdot" style="background:#FF5F57"></span><span class="tdot" style="background:#FEBC2E"></span><span class="tdot" style="background:#28C840"></span><span class="burl">🔒 psc.ac.th/portal</span></div>
+            <div style="display:flex;height:340px;background:#fff;">
+              <!-- sidebar -->
+              <div style="width:185px;background:#FAFAFC;border-right:1px solid #eee;padding:16px 14px;">
+                <div style="display:flex;align-items:center;gap:8px;"><div class="psclogo" style="width:30px;height:30px;font-size:11px;">PSC</div><div><div class="kanit" style="font-weight:700;font-size:15px;color:var(--psc);line-height:1;">PSC AI</div><div style="font-size:9px;color:#9aa0ad;">Student Portal</div></div></div>
+                <div class="kanit" style="margin-top:18px;display:flex;flex-direction:column;gap:4px;font-size:12px;">
+                  <div style="background:var(--pscbg);color:var(--psc);font-weight:600;padding:8px 10px;border-radius:9px;">＋ New Chat</div>
+                  <div style="color:#6b7280;padding:8px 10px;">⌗ Real-time Q&amp;A</div>
+                  <div style="color:#6b7280;padding:8px 10px;">▦ Upcoming Events</div>
+                  <div style="color:#6b7280;padding:8px 10px;">↺ History</div>
+                </div>
+                <div style="margin-top:auto;"></div>
+                <div class="kanit" style="margin-top:64px;background:var(--pscgrad);color:#fff;font-weight:600;font-size:12px;text-align:center;padding:9px;border-radius:10px;">♛ Upgrade to Pro</div>
+              </div>
+              <!-- main -->
+              <div style="flex:1;padding:30px 34px;display:flex;flex-direction:column;align-items:center;">
+                <div class="kanit" style="font-weight:700;font-size:30px;color:#1b2030;margin-top:8px;">Ready when you are</div>
+                <div style="font-size:12px;color:#9aa0ad;margin-top:6px;">How can I help with your studies today?</div>
+                <div style="margin-top:20px;width:100%;max-width:440px;border:1px solid #eee;border-radius:30px;box-shadow:0 14px 30px -16px rgba(230,18,140,.3);height:46px;display:flex;align-items:center;padding:0 8px 0 18px;">
+                  <span style="color:var(--psc);">✦</span>
+                  <span class="kanit" style="color:#b6bbc6;font-size:13px;margin-left:10px;flex:1;">Ask PSC AI…<span style="display:inline-block;width:2px;height:14px;background:var(--psc);vertical-align:middle;margin-left:2px;animation:blink 1s step-end infinite;"></span></span>
+                  <span class="psclogo" style="width:30px;height:30px;font-size:14px;">→</span>
+                </div>
+                <div style="display:flex;gap:8px;margin-top:14px;">
+                  <span class="kanit" style="font-size:11px;border:1px solid #eee;border-radius:999px;padding:6px 12px;color:#6b7280;">Class schedule</span>
+                  <span class="kanit" style="font-size:11px;border:1px solid #eee;border-radius:999px;padding:6px 12px;color:#6b7280;">Library hours</span>
+                  <span class="kanit" style="font-size:11px;border:1px solid #eee;border-radius:999px;padding:6px 12px;color:#6b7280;">Cafeteria menu</span>
+                </div>
+                <div style="display:flex;gap:12px;margin-top:24px;width:100%;">
+                  <div style="flex:1;border:1px solid #f0f0f4;border-radius:14px;padding:14px;"><div style="width:30px;height:30px;border-radius:9px;background:var(--pscbg);display:flex;align-items:center;justify-content:center;">🎓</div><div class="kanit" style="font-weight:600;font-size:13px;margin-top:10px;">College Q&amp;A</div><div style="font-size:10px;color:#9aa0ad;margin-top:3px;">Courses, rules, campus life</div></div>
+                  <div style="flex:1;border:1px solid #f0f0f4;border-radius:14px;padding:14px;position:relative;"><span class="kanit" style="position:absolute;top:12px;right:12px;font-size:8px;font-weight:700;color:#fff;background:var(--psc);padding:3px 7px;border-radius:999px;animation:livepulse 2s infinite;">LIVE</span><div style="width:30px;height:30px;border-radius:9px;background:#f1f1f4;display:flex;align-items:center;justify-content:center;">▦</div><div class="kanit" style="font-weight:600;font-size:13px;margin-top:10px;">Open House 2026</div><div style="font-size:10px;color:#9aa0ad;margin-top:3px;">Main Auditorium · 14:00</div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- floating website-widget -->
+        <div class="r" style="--d:.55s;position:absolute;right:-6px;bottom:-2px;width:300px;">
+          <div class="browser" style="border-radius:16px;animation:floatY 6s ease-in-out infinite .5s;">
+            <div style="background:#fff;padding:12px 14px;border-bottom:1px solid #f4d6e8;display:flex;align-items:center;gap:9px;">
+              <div class="psclogo" style="width:30px;height:30px;font-size:10px;">PSC</div>
+              <div><div class="kanit" style="font-weight:700;font-size:14px;color:var(--psc);line-height:1;">PSC Assistant</div><div style="font-size:9px;color:#16a34a;">● Online · Admissions AI</div></div>
+              <div style="margin-left:auto;color:#c9ccd6;">✕</div>
+            </div>
+            <div style="background:#fff;padding:14px;">
+              <div style="background:#F1F1F5;border-radius:14px;padding:10px 12px;font-size:11.5px;color:#3a3f4d;">Hello! I'm the PSC Admissions Bot. How can I help today?</div>
+              <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;">
+                <span class="kanit" style="font-size:10px;background:var(--pscbg);color:var(--psc);padding:5px 11px;border-radius:999px;">Tuition Fees</span>
+                <span class="kanit" style="font-size:10px;background:var(--pscbg);color:var(--psc);padding:5px 11px;border-radius:999px;">Scholarships</span>
+                <span class="kanit" style="font-size:10px;background:var(--pscbg);color:var(--psc);padding:5px 11px;border-radius:999px;">How to Apply</span>
+              </div>
+              <div style="display:flex;justify-content:flex-end;margin-top:10px;"><div style="background:var(--pscgrad);color:#fff;border-radius:14px;padding:10px 12px;font-size:11.5px;max-width:80%;">Tell me about the Digital Media program.</div></div>
+              <div style="margin-top:12px;border:1px solid #eee;border-radius:999px;height:34px;display:flex;align-items:center;padding:0 6px 0 14px;"><span class="kanit" style="font-size:11px;color:#b6bbc6;flex:1;">Type your question…</span><span class="psclogo" style="width:24px;height:24px;font-size:11px;">➤</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="pageno kanit">06</div>
+  </section>
+
+  <!-- ===== 7 PRODUCT: MOBILE + LINE ===== -->
+  <section class="slide" data-i="6">
+    <div class="pad">
+      <div class="kicker r">บนมือถือ & LINE</div>
+      <h2 class="r" style="--d:.1s;margin-top:12px;">คุยได้ทุกที่ — แม้ใน <span style="color:var(--line-green)">LINE</span></h2>
+      <div style="flex:1;display:flex;align-items:center;justify-content:center;gap:60px;">
+
+        <!-- phone 1: PSC mobile app chat -->
+        <div class="pop" style="--d:.3s;">
+          <div class="phone" style="width:262px;height:470px;animation:floatY2 7s ease-in-out infinite;"><div class="notch"></div>
+            <div style="background:#fff;padding:26px 16px 12px;border-bottom:1px solid #f4d6e8;display:flex;align-items:center;gap:9px;">
+              <div class="psclogo" style="width:30px;height:30px;font-size:10px;">PSC</div>
+              <div class="kanit" style="font-weight:700;font-size:16px;color:var(--psc);">PSC Assistant</div>
+              <div style="margin-left:auto;color:#c9ccd6;font-size:13px;">— ✕</div>
+            </div>
+            <div style="padding:12px;height:388px;overflow:hidden;">
+              <div style="background:var(--pscbg);border-radius:16px;padding:16px;text-align:center;">
+                <div style="font-size:24px;">🤖</div>
+                <div class="kanit" style="font-weight:700;font-size:18px;color:#3a1027;margin-top:4px;">Welcome, Parent!</div>
+                <div style="font-size:10px;color:#9b7185;margin-top:3px;">Ask me anything about PSC.</div>
+              </div>
+              <div style="display:flex;gap:8px;margin-top:14px;align-items:flex-start;">
+                <div class="psclogo" style="width:24px;height:24px;font-size:8px;flex-shrink:0;">AI</div>
+                <div style="background:#F1F1F5;border-radius:14px;padding:9px 11px;font-size:11px;color:#3a3f4d;">Hi! I can help with fees, tours, or applications. 😊</div>
+              </div>
+              <div style="display:flex;justify-content:flex-end;margin-top:10px;"><div style="background:var(--pscgrad);color:#fff;border-radius:14px;padding:9px 11px;font-size:11px;max-width:78%;">ขอข้อมูลค่าเทอมเทอมหน้าหน่อยค่ะ</div></div>
+              <div class="kanit" style="font-size:9px;color:#a7adba;letter-spacing:1px;margin-top:16px;">QUICK ACTIONS</div>
+              <div style="display:flex;gap:8px;margin-top:8px;">
+                <div style="flex:1;border:1px solid #f4d6e8;border-radius:12px;padding:10px;text-align:center;"><div style="color:var(--psc);">💳</div><div class="kanit" style="font-size:10px;color:var(--psc);font-weight:600;margin-top:4px;">Fee Structure</div></div>
+                <div style="flex:1;border:1px solid #f4d6e8;border-radius:12px;padding:10px;text-align:center;"><div style="color:var(--psc);">📅</div><div class="kanit" style="font-size:10px;color:var(--psc);font-weight:600;margin-top:4px;">Book a Tour</div></div>
+              </div>
+              <div style="margin-top:14px;border:1px solid #eee;border-radius:999px;height:34px;display:flex;align-items:center;padding:0 6px 0 14px;"><span class="kanit" style="font-size:11px;color:#b6bbc6;flex:1;">Type your question…</span><span class="psclogo" style="width:24px;height:24px;font-size:11px;">➤</span></div>
+            </div>
+          </div>
+          <div class="kanit" style="text-align:center;margin-top:10px;color:var(--muted);font-size:14px;">แอป / เว็บแชต</div>
+        </div>
+
+        <!-- phone 2: LINE mockup (NEW) -->
+        <div class="pop" style="--d:.5s;position:relative;">
+          <div style="position:absolute;top:-14px;right:-14px;background:var(--grad);color:#fff;font-family:'Kanit';font-weight:600;font-size:12px;padding:6px 14px;border-radius:999px;z-index:6;box-shadow:0 8px 20px -6px rgba(124,58,237,.7);">ทำขึ้นใหม่ ✨</div>
+          <div class="phone" style="width:262px;height:470px;animation:floatY 6.5s ease-in-out infinite .4s;"><div class="notch"></div>
+            <div style="background:var(--line-green);padding:24px 14px 8px;display:flex;align-items:center;gap:9px;color:#fff;">
+              <span style="font-size:16px;">‹</span>
+              <div class="psclogo" style="width:28px;height:28px;font-size:9px;border:2px solid #fff;">PSC</div>
+              <div><div class="kanit" style="font-weight:600;font-size:14px;line-height:1.1;">PSC Assistant <span style="font-size:9px;">✓</span></div><div style="font-size:9px;opacity:.85;">Official Account</div></div>
+              <div style="margin-left:auto;font-size:13px;">☰</div>
+            </div>
+            <div style="background:linear-gradient(180deg,#9DB6D8,#88A4CC);height:300px;padding:14px 12px;overflow:hidden;position:relative;">
+              <div class="kanit" style="text-align:center;font-size:9px;color:#fff;opacity:.85;margin-bottom:10px;">วันนี้</div>
+              <div style="display:flex;gap:7px;align-items:flex-start;margin-bottom:10px;">
+                <div class="psclogo" style="width:26px;height:26px;font-size:8px;flex-shrink:0;">PSC</div>
+                <div><div class="kanit" style="font-size:8px;color:#27406b;margin-bottom:3px;">PSC Assistant</div>
+                  <div style="background:#fff;border-radius:4px 14px 14px 14px;padding:9px 11px;font-size:11px;color:#222;max-width:170px;">สวัสดีค่ะ 👋 สอบถามข้อมูล PSC ได้เลยค่ะ</div></div>
+              </div>
+              <div style="display:flex;justify-content:flex-end;align-items:flex-end;gap:5px;margin-bottom:10px;">
+                <span style="font-size:8px;color:#3a517d;">09:41</span>
+                <div style="background:var(--line-green);color:#fff;border-radius:14px 4px 14px 14px;padding:9px 11px;font-size:11px;max-width:160px;">ค่าเทอมเทอมนี้เท่าไหร่คะ</div>
+              </div>
+              <div style="display:flex;gap:7px;align-items:flex-start;margin-bottom:10px;">
+                <div class="psclogo" style="width:26px;height:26px;font-size:8px;flex-shrink:0;">PSC</div>
+                <div style="background:#fff;border-radius:4px 14px 14px 14px;padding:9px 11px;font-size:11px;color:#222;max-width:172px;">ค่าเทอมภาคนี้ <b style="color:var(--psc)">฿18,500</b><br>ชำระภายใน 30 มิ.ย. 📌<br>จ่ายผ่านแอปได้เลยค่ะ</div>
+              </div>
+              <div style="display:flex;justify-content:flex-end;align-items:flex-end;gap:5px;margin-bottom:10px;">
+                <span style="font-size:8px;color:#3a517d;">09:41</span>
+                <div style="background:var(--line-green);color:#fff;border-radius:14px 4px 14px 14px;padding:9px 11px;font-size:11px;">มีกิจกรรมอะไรสัปดาห์นี้บ้าง</div>
+              </div>
+              <div style="display:flex;gap:7px;align-items:center;">
+                <div class="psclogo" style="width:26px;height:26px;font-size:8px;flex-shrink:0;">PSC</div>
+                <div style="background:#fff;border-radius:14px;padding:11px 14px;display:flex;gap:4px;">
+                  <span style="width:6px;height:6px;border-radius:50%;background:#b8bcc6;animation:typing 1.2s infinite 0s;"></span>
+                  <span style="width:6px;height:6px;border-radius:50%;background:#b8bcc6;animation:typing 1.2s infinite .2s;"></span>
+                  <span style="width:6px;height:6px;border-radius:50%;background:#b8bcc6;animation:typing 1.2s infinite .4s;"></span>
+                </div>
+              </div>
+            </div>
+            <div style="background:#fff;border-top:1px solid #eee;">
+              <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;color:#9aa0ad;font-size:14px;">＋ ☺ <span class="kanit" style="flex:1;font-size:11px;color:#b6bbc6;background:#f3f4f6;border-radius:999px;padding:6px 12px;">Aa</span> 🎤</div>
+              <div style="display:flex;border-top:1px solid #f1f1f4;">
+                <div class="kanit" style="flex:1;text-align:center;font-size:10px;color:#444;padding:9px 0;border-right:1px solid #f1f1f4;">ค่าเทอม</div>
+                <div class="kanit" style="flex:1;text-align:center;font-size:10px;color:#444;padding:9px 0;border-right:1px solid #f1f1f4;">ตารางเรียน</div>
+                <div class="kanit" style="flex:1;text-align:center;font-size:10px;color:#444;padding:9px 0;">สมัครเรียน</div>
+              </div>
+            </div>
+          </div>
+          <div class="kanit" style="text-align:center;margin-top:10px;color:var(--muted);font-size:14px;">LINE Official Account</div>
+        </div>
+      </div>
+    </div>
+    <div class="pageno kanit">07</div>
+  </section>
+
+  <!-- ===== 8 LOGIN ===== -->
+  <section class="slide" data-i="7">
+    <div class="pad" style="justify-content:center;align-items:center;text-align:center;">
+      <div class="pop" style="--d:.2s;width:110px;height:110px;border-radius:30px;background:var(--grad);background-size:200% 200%;animation:gshift 6s ease infinite;display:flex;align-items:center;justify-content:center;box-shadow:0 24px 50px -16px rgba(124,58,237,.7);">
+        <svg width="50" height="50" viewBox="0 0 24 24" fill="none"><rect x="5" y="11" width="14" height="9" rx="2" stroke="#fff" stroke-width="2"/><path d="M8 11V8a4 4 0 018 0v3" stroke="#fff" stroke-width="2"/><circle cx="12" cy="15.5" r="1.4" fill="#fff"/></svg></div>
+      <h2 class="r" style="--d:.35s;margin-top:28px;">เข้าใช้ด้วย<span class="gt">อีเมลวิทยาลัย</span></h2>
+      <div class="r glass kanit" style="--d:.5s;margin-top:22px;padding:14px 26px;border-radius:999px;font-size:20px;font-weight:500;letter-spacing:.5px;">name@psc.ac.th</div>
+      <div class="r muted kanit" style="--d:.65s;margin-top:20px;font-size:17px;letter-spacing:.5px;">🔒 ปลอดภัย&nbsp;&nbsp;•&nbsp;&nbsp;ควบคุมสิทธิ์ได้&nbsp;&nbsp;•&nbsp;&nbsp;ไม่ต้องสมัครใหม่</div>
+    </div>
+    <div class="pageno kanit">08</div>
+  </section>
+
+  <!-- ===== 9 TOOLS ===== -->
+  <section class="slide" data-i="8">
+    <div class="pad">
+      <div class="kicker r">ทำงานได้จริง</div>
+      <h2 class="r" style="--d:.1s;margin-top:14px;">ไม่ใช่แค่แชต</h2>
+      <div style="flex:1;display:grid;grid-template-columns:repeat(3,1fr);gap:18px;align-content:center;">
+        <div class="glass pop" style="--d:.25s;padding:24px;display:flex;align-items:center;gap:16px;"><div class="badge" style="width:56px;height:56px;background:rgba(52,211,153,.16);animation:floatY 5s ease-in-out infinite;"><svg width="26" height="26" viewBox="0 0 24 24" fill="none"><rect x="4" y="3" width="16" height="18" rx="2" stroke="#34D399" stroke-width="2"/><path d="M8 8h8M8 12h8M8 16h5" stroke="#34D399" stroke-width="2" stroke-linecap="round"/></svg></div><span class="kanit" style="font-weight:500;font-size:21px;">Excel & ตาราง</span></div>
+        <div class="glass pop" style="--d:.35s;padding:24px;display:flex;align-items:center;gap:16px;"><div class="badge" style="width:56px;height:56px;background:rgba(99,102,241,.16);animation:floatY 5s ease-in-out infinite .3s;"><svg width="26" height="26" viewBox="0 0 24 24" fill="none"><rect x="5" y="3" width="14" height="18" rx="2" stroke="#818CF8" stroke-width="2"/><path d="M8 8h8M8 12h8M8 16h6" stroke="#818CF8" stroke-width="2" stroke-linecap="round"/></svg></div><span class="kanit" style="font-weight:500;font-size:21px;">รายงาน</span></div>
+        <div class="glass pop" style="--d:.45s;padding:24px;display:flex;align-items:center;gap:16px;"><div class="badge" style="width:56px;height:56px;background:rgba(34,211,238,.16);animation:floatY 5s ease-in-out infinite .6s;"><svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M4 18V9M9 18V5M14 18v-7M19 18v-4" stroke="#22D3EE" stroke-width="2.4" stroke-linecap="round"/></svg></div><span class="kanit" style="font-weight:500;font-size:21px;">วิเคราะห์ข้อมูล</span></div>
+        <div class="glass pop" style="--d:.55s;padding:24px;display:flex;align-items:center;gap:16px;"><div class="badge" style="width:56px;height:56px;background:rgba(236,72,153,.16);animation:floatY 5s ease-in-out infinite .9s;"><svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M12 4v16M4 12h16" stroke="#EC4899" stroke-width="2.4" stroke-linecap="round"/></svg></div><span class="kanit" style="font-weight:500;font-size:21px;">ร่างคอนเทนต์</span></div>
+        <div class="glass pop" style="--d:.65s;padding:24px;display:flex;align-items:center;gap:16px;"><div class="badge" style="width:56px;height:56px;background:rgba(245,158,11,.16);animation:floatY 5s ease-in-out infinite 1.2s;"><svg width="26" height="26" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke="#F59E0B" stroke-width="2"/><path d="M12 8v4l3 2" stroke="#F59E0B" stroke-width="2" stroke-linecap="round"/></svg></div><span class="kanit" style="font-weight:500;font-size:21px;">ตอบ 24 ชม.</span></div>
+        <div class="glass pop" style="--d:.75s;padding:24px;display:flex;align-items:center;gap:16px;"><div class="badge" style="width:56px;height:56px;background:rgba(139,92,246,.16);animation:floatY 5s ease-in-out infinite 1.5s;"><svg width="26" height="26" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#A78BFA" stroke-width="2"/><path d="M3 12h18M12 3a15 15 0 010 18M12 3a15 15 0 000 18" stroke="#A78BFA" stroke-width="2"/></svg></div><span class="kanit" style="font-weight:500;font-size:21px;">ไทย / อังกฤษ</span></div>
+      </div>
+    </div>
+    <div class="pageno kanit">09</div>
+  </section>
+
+  <!-- ===== 10 BENEFITS ===== -->
+  <section class="slide" data-i="9">
+    <div class="pad" style="justify-content:center;">
+      <div class="kicker r">คุณค่าต่อวิทยาลัย</div>
+      <h2 class="r" style="--d:.1s;margin-top:14px;">ทำไมต้อง PSC College AI</h2>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:20px;margin-top:48px;">
+        <div class="glass pop" style="--d:.3s;padding:34px 24px;text-align:center;"><div class="kanit gt" style="font-weight:700;font-size:58px;" data-count="100" data-suffix="%">0%</div><div class="kanit" style="font-weight:500;font-size:19px;margin-top:6px;">ข้อมูลถูกต้อง</div></div>
+        <div class="glass pop" style="--d:.45s;padding:34px 24px;text-align:center;"><div class="kanit gt" style="font-weight:700;font-size:58px;">24/7</div><div class="kanit" style="font-weight:500;font-size:19px;margin-top:6px;">พร้อมตอบเสมอ</div></div>
+        <div class="glass pop" style="--d:.6s;padding:34px 24px;text-align:center;"><div class="kanit gt" style="font-weight:700;font-size:58px;" data-count="60" data-suffix="s">0s</div><div class="kanit" style="font-weight:500;font-size:19px;margin-top:6px;">ตอบใน 60 วินาที</div></div>
+        <div class="glass pop" style="--d:.75s;padding:34px 24px;text-align:center;"><div class="kanit gt" style="font-weight:700;font-size:58px;">↓</div><div class="kanit" style="font-weight:500;font-size:19px;margin-top:6px;">ลดงานซ้ำซาก</div></div>
+      </div>
+    </div>
+    <div class="pageno kanit">10</div>
+  </section>
+
+  <!-- ===== 11 CTA ===== -->
+  <section class="slide" data-i="10">
+    <div class="orb" style="width:480px;height:480px;right:-130px;bottom:-150px;opacity:.45;animation:spin 40s linear infinite;"></div>
+    <div class="pad" style="justify-content:center;align-items:center;text-align:center;">
+      <div class="kicker r">พร้อมเริ่มต้น</div>
+      <h1 class="r" style="--d:.2s;font-size:64px;margin-top:18px;max-width:880px;">ให้วิทยาลัยมีผู้ช่วย AI<br>ที่ <span class="gt2">ตอบถูก ทุกที่ ทุกเวลา</span></h1>
+      <div class="r" style="--d:.45s;display:flex;gap:16px;margin-top:40px;align-items:center;">
+        <div class="kanit" style="background:var(--grad);background-size:200% 200%;animation:gshift 5s ease infinite;font-weight:600;font-size:19px;padding:16px 34px;border-radius:14px;box-shadow:0 18px 40px -14px rgba(124,58,237,.7);">นัดสาธิตระบบ (Demo)</div>
+        <div class="glass kanit" style="font-weight:500;font-size:19px;padding:16px 30px;border-radius:14px;">chat.mediaforge.co</div>
+      </div>
+      <div class="r" style="--d:.6s;display:flex;align-items:center;gap:10px;margin-top:56px;opacity:.85;">
+        <i style="width:30px;height:30px;border-radius:9px;background:var(--grad);display:inline-block;"></i>
+        <span class="kanit" style="font-weight:600;font-size:20px;">MediaForge</span>
+      </div>
+    </div>
+    <div class="pageno kanit">11</div>
+  </section>
+
+</div></div>
+
+<div id="ui">
+  <button class="navbtn" id="prev">‹</button>
+  <div class="dotnav" id="dots"></div>
+  <button class="navbtn" id="next">›</button>
+</div>
+
+<script>
+const slides=[...document.querySelectorAll('.slide')];
+const dots=document.getElementById('dots');
+const bar=document.getElementById('bar');
+let cur=0;
+slides.forEach((s,i)=>{const b=document.createElement('b');b.onclick=()=>go(i);dots.appendChild(b);});
+const dEls=[...dots.children];
+function runCounters(slide){
+  slide.querySelectorAll('[data-count]').forEach(el=>{
+    const target=+el.dataset.count, suf=el.dataset.suffix||'';
+    const dur=1100,t0=performance.now();
+    function tick(t){const p=Math.min((t-t0)/dur,1);el.textContent=Math.round((1-Math.pow(1-p,3))*target)+suf;if(p<1)requestAnimationFrame(tick);}
+    requestAnimationFrame(tick);
+  });
+}
+function go(i){
+  cur=Math.max(0,Math.min(slides.length-1,i));
+  slides.forEach((s,k)=>{
+    if(k===cur){s.classList.remove('active');void s.offsetWidth;s.classList.add('active');runCounters(s);}
+    else s.classList.remove('active');
+  });
+  dEls.forEach((d,k)=>d.classList.toggle('on',k===cur));
+  bar.style.width=((cur+1)/slides.length*100)+'%';
+}
+window.go=go;
+document.getElementById('next').onclick=()=>go(cur+1);
+document.getElementById('prev').onclick=()=>go(cur-1);
+window.addEventListener('keydown',e=>{
+  if(e.key==='ArrowRight'||e.key===' '||e.key==='PageDown'){e.preventDefault();go(cur+1);}
+  if(e.key==='ArrowLeft'||e.key==='PageUp'){e.preventDefault();go(cur-1);}
+  if(e.key==='f'||e.key==='F'){document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen();}
+});
+let sx=null;
+window.addEventListener('touchstart',e=>sx=e.touches[0].clientX);
+window.addEventListener('touchend',e=>{if(sx==null)return;const dx=e.changedTouches[0].clientX-sx;if(Math.abs(dx)>50)go(cur+(dx<0?1:-1));sx=null;});
+function fit(){const s=Math.min(window.innerWidth/1280,window.innerHeight/720);document.getElementById('stage').style.transform='scale('+s+')';}
+window.addEventListener('resize',fit);
+(document.fonts?document.fonts.ready:Promise.resolve()).then(()=>{fit();go(0);});
+fit();go(0);
+</script>
+</body>
+</html>
