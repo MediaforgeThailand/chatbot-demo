@@ -122,6 +122,61 @@ npm run ingest:pdfs -- --dry-run
 
 Schema นี้ใช้ `extensions.vector(768)` ดังนั้น embedding ที่ insert ต้องมี 768 dimensions เท่านั้น และไม่ควรปน embedding จากคนละ model หรือคนละ dimension ในตารางเดียวกัน
 
+## Gmail Connector
+
+ระบบ Gmail connector ใช้ Google OAuth 2.0 และ Gmail API ฝั่ง backend เท่านั้น token จะถูกเข้ารหัสก่อนเก็บใน Supabase
+
+### Supabase migration
+
+รัน migration เพิ่มใน Supabase SQL Editor:
+
+```bash
+supabase/migrations/002_create_gmail_connections.sql
+```
+
+### Google Cloud OAuth
+
+สร้าง OAuth Client แบบ Web application แล้วเพิ่ม Authorized redirect URI:
+
+```text
+https://your-domain.com/api/gmail/oauth/callback
+```
+
+สำหรับ local:
+
+```text
+http://127.0.0.1:3001/api/gmail/oauth/callback
+```
+
+เปิดใช้งาน Gmail API และใช้ scope:
+
+```text
+openid email profile https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send
+```
+
+ถ้า OAuth consent screen ยังอยู่สถานะ Testing ให้เพิ่มอีเมลที่จะใช้ลองเชื่อมต่อไว้ใน Test users ของ Google Cloud ก่อน
+
+ถ้าเคยเชื่อม Gmail ก่อนเพิ่มสิทธิ์อ่านเมล ให้กดตัดการเชื่อมต่อแล้วเชื่อมใหม่ เพื่อให้ Google ออก token ที่มีทั้ง `gmail.readonly` และ `gmail.send`
+
+### Environment variables
+
+เพิ่มใน `.env.local` และ Vercel Production:
+
+```bash
+GOOGLE_OAUTH_CLIENT_ID=...
+GOOGLE_OAUTH_CLIENT_SECRET=...
+GMAIL_OAUTH_REDIRECT_URI=https://your-domain.com/api/gmail/oauth/callback
+GMAIL_TOKEN_ENCRYPTION_KEY=...
+```
+
+สร้าง `GMAIL_TOKEN_ENCRYPTION_KEY` ได้ด้วย:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+```
+
+ทดสอบได้ที่หน้า `Connectors` > `Gmail` > `เชื่อมต่อ` แล้วใช้ฟอร์มใน modal เพื่อส่งอีเมล ค้น inbox/search และสรุป thread
+
 ## API Flow
 
 `POST /api/chat`

@@ -23,6 +23,26 @@ type ConversationMemory = {
   corrections: string[];
 };
 
+type GmailConnectorStatus = {
+  connected: boolean;
+  configured?: boolean;
+  email?: string;
+  scope?: string;
+  missingEnv?: string[];
+  error?: string;
+};
+
+type GmailMessageSummary = {
+  id: string;
+  threadId: string;
+  subject: string;
+  from: string;
+  to: string;
+  date: string;
+  snippet: string;
+  labelIds: string[];
+};
+
 const MAX_HISTORY_MESSAGES = 24;
 
 const starters = [
@@ -57,6 +77,12 @@ export function ChatDemo() {
   const [isLoading, setIsLoading] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
   const [navOpen, setNavOpen] = useState(false);
+  const [connectorsOpen, setConnectorsOpen] = useState(false);
+  const [gmailStatus, setGmailStatus] = useState<GmailConnectorStatus>({
+    connected: false,
+  });
+  const [gmailStatusLoading, setGmailStatusLoading] = useState(true);
+  const [gmailStatusError, setGmailStatusError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const canSubmit = useMemo(
@@ -75,6 +101,78 @@ export function ChatDemo() {
       behavior: "smooth",
     });
   }, [messages, isLoading, isEmptyState]);
+
+  useEffect(() => {
+    void refreshGmailStatus();
+  }, []);
+
+  async function refreshGmailStatus() {
+    setGmailStatusLoading(true);
+    setGmailStatusError(null);
+
+    try {
+      const response = await fetch("/api/gmail/status", {
+        cache: "no-store",
+      });
+      const data = (await response.json()) as GmailConnectorStatus;
+
+      setGmailStatus({
+        connected: data.connected === true,
+        configured: data.configured,
+        email: data.email,
+        scope: data.scope,
+        missingEnv: data.missingEnv,
+        error: data.error,
+      });
+
+      if (!response.ok) {
+        setGmailStatusError(
+          data.missingEnv?.length
+            ? `ยังไม่ได้ตั้งค่า env: ${data.missingEnv.join(", ")}`
+            : data.error ?? "อ่านสถานะ Gmail ไม่สำเร็จ",
+        );
+      }
+    } catch (error) {
+      setGmailStatus({ connected: false });
+      setGmailStatusError(
+        error instanceof Error ? error.message : "อ่านสถานะ Gmail ไม่สำเร็จ",
+      );
+    } finally {
+      setGmailStatusLoading(false);
+    }
+  }
+
+  function connectGmail() {
+    window.location.href = "/api/gmail/oauth/start";
+  }
+
+  async function disconnectGmail() {
+    setGmailStatusLoading(true);
+    setGmailStatusError(null);
+
+    try {
+      const response = await fetch("/api/gmail/disconnect", {
+        method: "POST",
+      });
+      const data = (await response.json()) as GmailConnectorStatus & {
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(data.error ?? "ตัดการเชื่อมต่อ Gmail ไม่สำเร็จ");
+      }
+
+      setGmailStatus({ connected: false });
+    } catch (error) {
+      setGmailStatusError(
+        error instanceof Error
+          ? error.message
+          : "ตัดการเชื่อมต่อ Gmail ไม่สำเร็จ",
+      );
+    } finally {
+      setGmailStatusLoading(false);
+    }
+  }
 
   async function submitQuestion(nextQuestion = question) {
     const trimmedQuestion = nextQuestion.trim();
@@ -195,10 +293,14 @@ export function ChatDemo() {
         onClose={() => setNavOpen(false)}
         onNewChat={resetConversation}
         onAsk={(q) => void submitQuestion(q)}
+        onOpenConnectors={() => setConnectorsOpen(true)}
       />
 
       <main className="relative flex flex-1 flex-col overflow-hidden bg-surface">
-        <MobileTopBar onOpenNav={() => setNavOpen(true)} />
+        <MobileTopBar
+          onOpenNav={() => setNavOpen(true)}
+          onOpenConnectors={() => setConnectorsOpen(true)}
+        />
 
         <div
           ref={scrollRef}
@@ -232,6 +334,17 @@ export function ChatDemo() {
           canSubmit={canSubmit}
         />
       </main>
+
+      <ConnectorsModal
+        open={connectorsOpen}
+        gmailStatus={gmailStatus}
+        isStatusLoading={gmailStatusLoading}
+        statusError={gmailStatusError}
+        onClose={() => setConnectorsOpen(false)}
+        onConnect={connectGmail}
+        onDisconnect={() => void disconnectGmail()}
+        onRefreshStatus={() => void refreshGmailStatus()}
+      />
     </div>
   );
 }
@@ -420,11 +533,13 @@ function SideNav({
   onClose,
   onNewChat,
   onAsk,
+  onOpenConnectors,
 }: {
   open: boolean;
   onClose: () => void;
   onNewChat: () => void;
   onAsk: (question: string) => void;
+  onOpenConnectors: () => void;
 }) {
   function runAndClose(action: () => void) {
     action();
@@ -504,6 +619,17 @@ function SideNav({
             <MIcon name="history" className="group-hover:text-primary" />
             <span className="font-label-bold text-body-md">History</span>
           </a>
+          <button
+            type="button"
+            onClick={() => runAndClose(onOpenConnectors)}
+            className="group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-on-surface-variant transition-colors hover:bg-primary-container/10"
+          >
+            <MIcon name="hub" className="group-hover:text-primary" />
+            <span className="font-label-bold text-body-md">Connectors</span>
+            <span className="ml-auto rounded-full bg-primary-fixed px-2 py-0.5 text-[10px] font-bold text-primary">
+              Gmail
+            </span>
+          </button>
         </nav>
 
         <div className="mt-auto flex flex-col gap-1 border-t border-surface-container pt-6">
@@ -536,7 +662,13 @@ function SideNav({
   );
 }
 
-function MobileTopBar({ onOpenNav }: { onOpenNav: () => void }) {
+function MobileTopBar({
+  onOpenNav,
+  onOpenConnectors,
+}: {
+  onOpenNav: () => void;
+  onOpenConnectors: () => void;
+}) {
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between bg-surface-container-lowest/80 px-4 backdrop-blur-xl md:hidden">
       <div className="flex items-center gap-1">
@@ -553,14 +685,608 @@ function MobileTopBar({ onOpenNav }: { onOpenNav: () => void }) {
           PSC AI
         </span>
       </div>
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          onClick={onOpenConnectors}
+          className="rounded-full p-2 text-on-surface-variant transition-colors hover:bg-surface-container"
+          aria-label="เปิด Connectors"
+        >
+          <MIcon name="hub" />
+        </button>
+        <button
+          type="button"
+          className="rounded-full p-2 text-on-surface-variant transition-colors hover:bg-surface-container"
+          aria-label="การแจ้งเตือน"
+        >
+          <MIcon name="notifications" />
+        </button>
+      </div>
+    </header>
+  );
+}
+
+function ConnectorsModal({
+  open,
+  gmailStatus,
+  isStatusLoading,
+  statusError,
+  onClose,
+  onConnect,
+  onDisconnect,
+  onRefreshStatus,
+}: {
+  open: boolean;
+  gmailStatus: GmailConnectorStatus;
+  isStatusLoading: boolean;
+  statusError: string | null;
+  onClose: () => void;
+  onConnect: () => void;
+  onDisconnect: () => void;
+  onRefreshStatus: () => void;
+}) {
+  if (!open) {
+    return null;
+  }
+
+  const connected = gmailStatus.connected;
+  const isConnectorConfigured = gmailStatus.configured !== false;
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 px-4 py-6 backdrop-blur-sm">
       <button
         type="button"
-        className="rounded-full p-2 text-on-surface-variant transition-colors hover:bg-surface-container"
-        aria-label="การแจ้งเตือน"
+        aria-label="ปิด Connectors"
+        onClick={onClose}
+        className="absolute inset-0 cursor-default"
+      />
+
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="connectors-title"
+        className="relative flex h-[min(760px,92vh)] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-outline-variant bg-surface-container-lowest shadow-2xl"
       >
-        <MIcon name="notifications" />
-      </button>
-    </header>
+        <header className="flex shrink-0 items-start justify-between gap-4 border-b border-surface-container px-6 py-5">
+          <div className="min-w-0">
+            <p className="font-label-bold text-label-bold uppercase text-primary">
+              MCP tools
+            </p>
+            <h2
+              id="connectors-title"
+              className="mt-1 font-headline-lg-mobile text-headline-lg-mobile font-bold text-on-surface"
+            >
+              Connectors
+            </h2>
+            <p className="mt-1 max-w-xl text-body-sm text-on-surface-variant">
+              เชื่อมต่อแพลตฟอร์มภายนอกเพื่อให้ PSC AI ทำงานกับเครื่องมือของคุณได้
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="ปิดหน้าต่าง"
+            className="rounded-full p-2 text-on-surface-variant transition-colors hover:bg-surface-container"
+          >
+            <MIcon name="close" />
+          </button>
+        </header>
+
+        <div className="grid min-h-0 flex-1 md:grid-cols-[280px_1fr]">
+          <aside className="flex min-h-0 flex-col border-b border-surface-container bg-surface-container-low px-4 py-4 md:border-r md:border-b-0">
+            <label className="relative mb-4 block">
+              <MIcon
+                name="search"
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant"
+              />
+              <input
+                value="Gmail"
+                readOnly
+                aria-label="ค้นหา Connectors"
+                className="w-full rounded-full border border-outline-variant bg-surface-container-lowest py-3 pr-4 pl-11 text-body-sm text-on-surface focus:outline-none"
+              />
+            </label>
+
+            <button
+              type="button"
+              className="flex w-full items-center gap-3 rounded-xl border border-primary/20 bg-primary-fixed/60 p-3 text-left shadow-sm"
+            >
+              <GmailMark className="h-10 w-10" />
+              <span className="min-w-0 flex-1">
+                <span className="block font-label-bold text-body-md text-on-surface">
+                  Gmail
+                </span>
+                <span className="block truncate text-body-sm text-on-surface-variant">
+                  ค้นหา อ่าน ร่าง และส่งอีเมล
+                </span>
+              </span>
+              <MIcon name="chevron_right" className="text-primary" />
+            </button>
+
+            <div className="mt-auto hidden rounded-xl bg-surface-container-lowest p-4 text-body-sm text-on-surface-variant md:block">
+              <div className="mb-2 flex items-center gap-2 font-label-bold text-label-bold text-primary">
+                <MIcon name="shield_lock" />
+                Permission scoped
+              </div>
+              ใช้สิทธิ์เฉพาะงานอีเมล และควรให้ผู้ใช้ยืนยันก่อนส่งเมลจริง
+            </div>
+          </aside>
+
+          <div className="custom-scrollbar min-h-0 overflow-y-auto px-6 py-6">
+            <div className="mx-auto max-w-2xl">
+              <div className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-4">
+                  <GmailMark className="h-16 w-16" />
+                  <div>
+                    <h3 className="font-headline-lg text-headline-lg font-bold text-on-surface">
+                      Gmail
+                    </h3>
+                    <p className="text-body-sm text-on-surface-variant">
+                      Email connector สำหรับ MCP workflow
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={connected ? onDisconnect : onConnect}
+                  disabled={isStatusLoading || !isConnectorConfigured}
+                  className={`inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 font-label-bold text-label-bold shadow-sm transition ${
+                    connected
+                      ? "bg-surface-container text-primary ring-1 ring-primary/20 hover:bg-primary-fixed"
+                      : "bg-on-surface text-surface-container-lowest hover:bg-inverse-surface"
+                  } disabled:cursor-not-allowed disabled:opacity-60`}
+                >
+                  <MIcon name={connected ? "check_circle" : "link"} fill={connected} />
+                  {isStatusLoading
+                    ? "กำลังตรวจสอบ"
+                    : !isConnectorConfigured
+                      ? "ยังไม่พร้อม"
+                      : connected
+                        ? "ตัดการเชื่อมต่อ"
+                        : "เชื่อมต่อ"}
+                </button>
+              </div>
+
+              <p className="mb-8 text-body-md text-on-surface">
+                ใช้ Gmail เพื่อให้ PSC AI ส่งอีเมลจากบัญชีที่เชื่อมต่อไว้ได้จริง
+                โดยใช้ OAuth และ Gmail API ฝั่ง server
+              </p>
+
+              {statusError ? (
+                <div className="mb-6 rounded-xl border border-error/20 bg-error-container p-4 text-body-sm text-on-error-container">
+                  {statusError}
+                </div>
+              ) : null}
+
+              <section className="overflow-hidden rounded-xl border border-surface-container bg-surface-container-lowest">
+                <div className="border-b border-surface-container px-5 py-4">
+                  <h4 className="font-label-bold text-body-md text-on-surface">
+                    ข้อมูล
+                  </h4>
+                </div>
+                <ConnectorInfoRow label="หมวดหมู่" value="Productivity" />
+                <ConnectorInfoRow label="ความสามารถ" value="OAuth, refresh token และส่งอีเมลผ่าน Gmail API" />
+                <ConnectorInfoRow label="แพลตฟอร์ม" value="Gmail / Google Workspace" />
+                <ConnectorInfoRow label="วิธีเชื่อมต่อ" value="Google OAuth 2.0 + Gmail API" />
+                <ConnectorInfoRow
+                  label="บัญชี"
+                  value={gmailStatus.email ?? (connected ? "เชื่อมต่อแล้ว" : "-")}
+                />
+                <ConnectorInfoRow
+                  label="สถานะ"
+                  value={
+                    isStatusLoading
+                      ? "กำลังตรวจสอบ"
+                      : connected
+                        ? "เชื่อมต่อจริงแล้ว"
+                        : "ยังไม่เชื่อมต่อ"
+                  }
+                />
+              </section>
+
+              <GmailSendTester
+                enabled={connected}
+                onSent={onRefreshStatus}
+              />
+
+              <GmailMailboxExplorer enabled={connected} />
+
+              <section className="mt-6 grid gap-3 sm:grid-cols-2">
+                {[
+                  ["verified_user", "OAuth จริง", "เก็บ token ใน Supabase แบบเข้ารหัส"],
+                  ["refresh", "Refresh token", "ต่ออายุ access token อัตโนมัติฝั่ง server"],
+                  ["send", "ส่งเมล", "ส่งอีเมลหลังผู้ใช้ตรวจและยืนยัน"],
+                  ["lock", "Server-only", "ไม่ส่ง Google token ไปที่ frontend"],
+                ].map(([icon, title, detail]) => (
+                  <div
+                    key={title}
+                    className="rounded-xl border border-surface-container bg-surface-container-low p-4"
+                  >
+                    <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-primary-fixed text-primary">
+                      <MIcon name={icon} />
+                    </div>
+                    <h5 className="font-label-bold text-body-md text-on-surface">
+                      {title}
+                    </h5>
+                    <p className="mt-1 text-body-sm text-on-surface-variant">
+                      {detail}
+                    </p>
+                  </div>
+                ))}
+              </section>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function ConnectorInfoRow({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="grid grid-cols-[140px_1fr] border-b border-surface-container px-5 py-4 last:border-b-0">
+      <span className="font-label-bold text-label-bold text-on-surface-variant">
+        {label}
+      </span>
+      <span className="font-label-bold text-body-sm text-on-surface">{value}</span>
+    </div>
+  );
+}
+
+function GmailSendTester({
+  enabled,
+  onSent,
+}: {
+  enabled: boolean;
+  onSent: () => void;
+}) {
+  const [to, setTo] = useState("");
+  const [subject, setSubject] = useState("ทดสอบส่งอีเมลจาก PSC AI");
+  const [body, setBody] = useState(
+    "สวัสดีครับ นี่คืออีเมลทดสอบจาก Gmail connector ของ PSC AI",
+  );
+  const [isSending, setIsSending] = useState(false);
+  const [sendResult, setSendResult] = useState<string | null>(null);
+  const [sendError, setSendError] = useState<string | null>(null);
+
+  async function sendTestEmail(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!enabled || isSending) {
+      return;
+    }
+
+    setIsSending(true);
+    setSendResult(null);
+    setSendError(null);
+
+    try {
+      const response = await fetch("/api/gmail/send", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          to,
+          subject,
+          body,
+        }),
+      });
+      const data = (await response.json()) as {
+        sent?: boolean;
+        id?: string;
+        error?: string;
+      };
+
+      if (!response.ok || !data.sent) {
+        throw new Error(data.error ?? "ส่งอีเมลไม่สำเร็จ");
+      }
+
+      setSendResult(data.id ? `ส่งสำเร็จแล้ว Message ID: ${data.id}` : "ส่งสำเร็จแล้ว");
+      onSent();
+    } catch (error) {
+      setSendError(error instanceof Error ? error.message : "ส่งอีเมลไม่สำเร็จ");
+    } finally {
+      setIsSending(false);
+    }
+  }
+
+  return (
+    <section className="mt-6 rounded-xl border border-surface-container bg-surface-container-low p-5">
+      <div className="mb-4 flex items-start justify-between gap-4">
+        <div>
+          <h4 className="font-label-bold text-body-md text-on-surface">
+            ทดสอบส่งอีเมล
+          </h4>
+          <p className="mt-1 text-body-sm text-on-surface-variant">
+            ส่งผ่าน Gmail API จากบัญชีที่เชื่อมต่อไว้จริง
+          </p>
+        </div>
+        <span
+          className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wide ${
+            enabled
+              ? "bg-primary text-on-primary"
+              : "bg-surface-container-high text-on-surface-variant"
+          }`}
+        >
+          {enabled ? "Ready" : "Connect first"}
+        </span>
+      </div>
+
+      <form onSubmit={sendTestEmail} className="space-y-3">
+        <label className="block">
+          <span className="mb-1 block font-label-bold text-label-bold text-on-surface-variant">
+            ส่งถึง
+          </span>
+          <input
+            value={to}
+            onChange={(event) => setTo(event.target.value)}
+            disabled={!enabled || isSending}
+            className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-3 text-body-sm text-on-surface focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+            placeholder="name@example.com"
+            type="email"
+            autoComplete="email"
+            required
+          />
+        </label>
+        <label className="block">
+          <span className="mb-1 block font-label-bold text-label-bold text-on-surface-variant">
+            หัวข้อ
+          </span>
+          <input
+            value={subject}
+            onChange={(event) => setSubject(event.target.value)}
+            disabled={!enabled || isSending}
+            className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-3 text-body-sm text-on-surface focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+            required
+          />
+        </label>
+        <label className="block">
+          <span className="mb-1 block font-label-bold text-label-bold text-on-surface-variant">
+            ข้อความ
+          </span>
+          <textarea
+            value={body}
+            onChange={(event) => setBody(event.target.value)}
+            disabled={!enabled || isSending}
+            className="min-h-28 w-full resize-y rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-3 text-body-sm text-on-surface focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+            required
+          />
+        </label>
+
+        {sendError ? (
+          <div className="rounded-lg bg-error-container px-4 py-3 text-body-sm text-on-error-container">
+            {sendError}
+          </div>
+        ) : null}
+        {sendResult ? (
+          <div className="rounded-lg bg-primary-fixed px-4 py-3 text-body-sm text-primary">
+            {sendResult}
+          </div>
+        ) : null}
+
+        <button
+          type="submit"
+          disabled={!enabled || isSending}
+          className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-3 font-label-bold text-label-bold text-on-primary transition hover:bg-primary-container disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <MIcon name="send" fill />
+          {isSending ? "กำลังส่ง" : "ส่งอีเมลทดสอบ"}
+        </button>
+      </form>
+    </section>
+  );
+}
+
+function GmailMailboxExplorer({ enabled }: { enabled: boolean }) {
+  const [query, setQuery] = useState("in:inbox newer_than:30d");
+  const [messages, setMessages] = useState<GmailMessageSummary[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [isSummarizingThreadId, setIsSummarizingThreadId] = useState<string | null>(
+    null,
+  );
+  const [summary, setSummary] = useState<string | null>(null);
+  const [mailError, setMailError] = useState<string | null>(null);
+
+  async function searchMessages(event?: FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
+
+    if (!enabled || isSearching) {
+      return;
+    }
+
+    setIsSearching(true);
+    setMailError(null);
+    setSummary(null);
+
+    try {
+      const params = new URLSearchParams({
+        q: query.trim() || "in:inbox newer_than:30d",
+        maxResults: "8",
+      });
+      const response = await fetch(`/api/gmail/messages?${params.toString()}`, {
+        cache: "no-store",
+      });
+      const data = (await response.json()) as {
+        messages?: GmailMessageSummary[];
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(data.error ?? "ค้นหาอีเมลไม่สำเร็จ");
+      }
+
+      setMessages(data.messages ?? []);
+    } catch (error) {
+      setMessages([]);
+      setMailError(error instanceof Error ? error.message : "ค้นหาอีเมลไม่สำเร็จ");
+    } finally {
+      setIsSearching(false);
+    }
+  }
+
+  async function summarizeThread(threadId: string) {
+    if (!enabled || isSummarizingThreadId) {
+      return;
+    }
+
+    setIsSummarizingThreadId(threadId);
+    setMailError(null);
+    setSummary(null);
+
+    try {
+      const response = await fetch(
+        `/api/gmail/threads/${encodeURIComponent(threadId)}/summary`,
+        {
+          cache: "no-store",
+        },
+      );
+      const data = (await response.json()) as {
+        summary?: string;
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(data.error ?? "สรุป thread ไม่สำเร็จ");
+      }
+
+      setSummary(data.summary ?? "ไม่พบข้อมูลสำหรับสรุปครับ");
+    } catch (error) {
+      setMailError(error instanceof Error ? error.message : "สรุป thread ไม่สำเร็จ");
+    } finally {
+      setIsSummarizingThreadId(null);
+    }
+  }
+
+  return (
+    <section className="mt-6 rounded-xl border border-surface-container bg-surface-container-low p-5">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h4 className="font-label-bold text-body-md text-on-surface">
+            อ่าน ค้นหา และสรุป Gmail
+          </h4>
+          <p className="mt-1 text-body-sm text-on-surface-variant">
+            ใช้ Gmail API อ่าน inbox/search จริง แล้วส่งเนื้อหา thread ให้ Gemini สรุป
+          </p>
+        </div>
+        <span
+          className={`w-fit rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wide ${
+            enabled
+              ? "bg-primary text-on-primary"
+              : "bg-surface-container-high text-on-surface-variant"
+          }`}
+        >
+          {enabled ? "Readonly ready" : "Connect first"}
+        </span>
+      </div>
+
+      <p className="mb-4 rounded-lg bg-surface-container-lowest px-4 py-3 text-body-sm text-on-surface-variant">
+        ถ้าเคยเชื่อม Gmail ก่อนเพิ่มระบบอ่านเมล ให้กดตัดการเชื่อมต่อแล้วเชื่อมใหม่
+        เพื่อขอสิทธิ์ `gmail.readonly`
+      </p>
+
+      <form onSubmit={searchMessages} className="flex flex-col gap-3 sm:flex-row">
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          disabled={!enabled || isSearching}
+          className="min-w-0 flex-1 rounded-lg border border-outline-variant bg-surface-container-lowest px-4 py-3 text-body-sm text-on-surface focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+          placeholder="เช่น from:someone@example.com newer_than:7d"
+        />
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setQuery("in:inbox newer_than:30d")}
+            disabled={!enabled || isSearching}
+            className="rounded-full border border-outline-variant bg-surface-container-lowest px-4 py-3 font-label-bold text-label-bold text-on-surface transition hover:bg-primary-fixed disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Inbox
+          </button>
+          <button
+            type="submit"
+            disabled={!enabled || isSearching}
+            className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-3 font-label-bold text-label-bold text-on-primary transition hover:bg-primary-container disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <MIcon name="search" />
+            {isSearching ? "กำลังค้น" : "ค้นเมล"}
+          </button>
+        </div>
+      </form>
+
+      {mailError ? (
+        <div className="mt-4 rounded-lg bg-error-container px-4 py-3 text-body-sm text-on-error-container">
+          {mailError}
+        </div>
+      ) : null}
+
+      {messages.length > 0 ? (
+        <div className="mt-4 space-y-3">
+          {messages.map((message) => (
+            <article
+              key={message.id}
+              className="rounded-lg border border-surface-container bg-surface-container-lowest p-4"
+            >
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <h5 className="truncate font-label-bold text-body-md text-on-surface">
+                    {message.subject}
+                  </h5>
+                  <p className="mt-1 truncate text-body-sm text-on-surface-variant">
+                    จาก {message.from || "-"}
+                  </p>
+                  <p className="mt-2 line-clamp-2 text-body-sm text-on-surface-variant">
+                    {message.snippet || "ไม่มี snippet"}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void summarizeThread(message.threadId)}
+                  disabled={!enabled || Boolean(isSummarizingThreadId)}
+                  className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full border border-primary/20 bg-primary-fixed px-4 py-2 font-label-bold text-label-bold text-primary transition hover:bg-primary-fixed-dim disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <MIcon name="summarize" />
+                  {isSummarizingThreadId === message.threadId
+                    ? "กำลังสรุป"
+                    : "สรุป thread"}
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : null}
+
+      {summary ? (
+        <div className="mt-4 rounded-lg border border-primary/20 bg-primary-fixed px-4 py-3">
+          <h5 className="mb-2 font-label-bold text-body-md text-primary">
+            สรุป thread
+          </h5>
+          <p className="whitespace-pre-wrap text-body-sm text-on-primary-fixed">
+            {summary}
+          </p>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function GmailMark({ className = "" }: { className?: string }) {
+  return (
+    <span
+      className={`relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-outline-variant bg-white shadow-sm ${className}`}
+      aria-hidden="true"
+    >
+      <span className="absolute left-[24%] top-[33%] h-[34%] w-[10%] rotate-[-35deg] rounded-full bg-[#4285f4]" />
+      <span className="absolute left-[35%] top-[30%] h-[10%] w-[31%] rotate-[35deg] rounded-full bg-[#ea4335]" />
+      <span className="absolute right-[24%] top-[33%] h-[34%] w-[10%] rotate-[35deg] rounded-full bg-[#34a853]" />
+      <span className="absolute bottom-[26%] left-[24%] h-[10%] w-[22%] rounded-full bg-[#fbbc04]" />
+      <span className="absolute bottom-[26%] right-[24%] h-[10%] w-[22%] rounded-full bg-[#ea4335]" />
+    </span>
   );
 }
 
