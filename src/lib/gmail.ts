@@ -73,6 +73,7 @@ const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GOOGLE_REVOKE_URL = "https://oauth2.googleapis.com/revoke";
 const GMAIL_SEND_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages/send";
+const GMAIL_DRAFTS_URL = "https://gmail.googleapis.com/gmail/v1/users/me/drafts";
 const GMAIL_MESSAGES_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages";
 const GMAIL_THREADS_URL = "https://gmail.googleapis.com/gmail/v1/users/me/threads";
 const GEMINI_API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
@@ -81,6 +82,7 @@ const GMAIL_SCOPES = [
   "email",
   "profile",
   "https://www.googleapis.com/auth/gmail.readonly",
+  "https://www.googleapis.com/auth/gmail.compose",
   "https://www.googleapis.com/auth/gmail.send",
 ];
 const OAUTH_STATE_MAX_AGE_MS = 10 * 60 * 1000;
@@ -463,6 +465,53 @@ export async function sendGmailMessage({
   return {
     id: data.id,
     threadId: data.threadId,
+  };
+}
+
+export async function createGmailDraft({
+  accessToken,
+  to,
+  subject,
+  body,
+}: {
+  accessToken: string;
+  to: string;
+  subject: string;
+  body: string;
+}): Promise<{ id?: string; messageId?: string; threadId?: string }> {
+  const raw = buildRawMimeMessage({ to, subject, body });
+  const response = await fetch(GMAIL_DRAFTS_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      message: {
+        raw,
+      },
+    }),
+    cache: "no-store",
+  });
+  const data = (await response.json().catch(() => ({}))) as {
+    id?: string;
+    message?: {
+      id?: string;
+      threadId?: string;
+    };
+    error?: { message?: string };
+  };
+
+  if (!response.ok) {
+    throw new GmailConnectionError(
+      data.error?.message ?? `Gmail draft request failed: ${response.status}`,
+    );
+  }
+
+  return {
+    id: data.id,
+    messageId: data.message?.id,
+    threadId: data.message?.threadId,
   };
 }
 

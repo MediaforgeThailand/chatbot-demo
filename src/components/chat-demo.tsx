@@ -865,7 +865,7 @@ function ConnectorsModal({
                   </h4>
                 </div>
                 <ConnectorInfoRow label="หมวดหมู่" value="Productivity" />
-                <ConnectorInfoRow label="ความสามารถ" value="OAuth, refresh token และส่งอีเมลผ่าน Gmail API" />
+                <ConnectorInfoRow label="ความสามารถ" value="OAuth, refresh token, สร้าง draft และส่งอีเมลผ่าน Gmail API" />
                 <ConnectorInfoRow label="แพลตฟอร์ม" value="Gmail / Google Workspace" />
                 <ConnectorInfoRow label="วิธีเชื่อมต่อ" value="Google OAuth 2.0 + Gmail API" />
                 <ConnectorInfoRow
@@ -895,7 +895,8 @@ function ConnectorsModal({
                 {[
                   ["verified_user", "OAuth จริง", "เก็บ token ใน Supabase แบบเข้ารหัส"],
                   ["refresh", "Refresh token", "ต่ออายุ access token อัตโนมัติฝั่ง server"],
-                  ["send", "ส่งเมล", "ส่งอีเมลหลังผู้ใช้ตรวจและยืนยัน"],
+                  ["drafts", "สร้าง Draft", "ร่างอีเมลให้ตรวจใน Gmail ก่อนส่งจริง"],
+                  ["send", "ส่งเมล", "ส่งจริงเฉพาะเมื่อผู้ใช้ยืนยันชัดเจน"],
                   ["lock", "Server-only", "ไม่ส่ง Google token ไปที่ frontend"],
                 ].map(([icon, title, detail]) => (
                   <div
@@ -962,36 +963,62 @@ function GmailSendTester({
       return;
     }
 
+    const submitter = (event.nativeEvent as SubmitEvent)
+      .submitter as HTMLButtonElement | null;
+    const mode = submitter?.value === "send" ? "send" : "draft";
+
     setIsSending(true);
     setSendResult(null);
     setSendError(null);
 
     try {
-      const response = await fetch("/api/gmail/send", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      const response = await fetch(
+        mode === "draft" ? "/api/gmail/draft" : "/api/gmail/send",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            to,
+            subject,
+            body,
+          }),
         },
-        body: JSON.stringify({
-          to,
-          subject,
-          body,
-        }),
-      });
+      );
       const data = (await response.json()) as {
+        drafted?: boolean;
         sent?: boolean;
         id?: string;
+        messageId?: string;
         error?: string;
       };
 
-      if (!response.ok || !data.sent) {
-        throw new Error(data.error ?? "ส่งอีเมลไม่สำเร็จ");
+      if (mode === "draft") {
+        if (!response.ok || !data.drafted) {
+          throw new Error(data.error ?? "สร้าง draft ไม่สำเร็จ");
+        }
+
+        setSendResult(
+          data.id
+            ? `สร้าง draft สำเร็จแล้ว Draft ID: ${data.id}`
+            : "สร้าง draft สำเร็จแล้ว",
+        );
+      } else {
+        if (!response.ok || !data.sent) {
+          throw new Error(data.error ?? "ส่งอีเมลไม่สำเร็จ");
+        }
+
+        setSendResult(
+          data.id ? `ส่งสำเร็จแล้ว Message ID: ${data.id}` : "ส่งสำเร็จแล้ว",
+        );
       }
 
-      setSendResult(data.id ? `ส่งสำเร็จแล้ว Message ID: ${data.id}` : "ส่งสำเร็จแล้ว");
       onSent();
     } catch (error) {
-      setSendError(error instanceof Error ? error.message : "ส่งอีเมลไม่สำเร็จ");
+      setSendError(
+        error instanceof Error ? error.message : "ทำรายการ Gmail ไม่สำเร็จ",
+      );
     } finally {
       setIsSending(false);
     }
@@ -1002,10 +1029,10 @@ function GmailSendTester({
       <div className="mb-4 flex items-start justify-between gap-4">
         <div>
           <h4 className="font-label-bold text-body-md text-on-surface">
-            ทดสอบส่งอีเมล
+            ทดสอบร่างและส่งอีเมล
           </h4>
           <p className="mt-1 text-body-sm text-on-surface-variant">
-            ส่งผ่าน Gmail API จากบัญชีที่เชื่อมต่อไว้จริง
+            สร้าง draft ใน Gmail ให้ตรวจได้ก่อน หรือส่งจริงเมื่อยืนยันชัดเจน
           </p>
         </div>
         <span
@@ -1071,14 +1098,26 @@ function GmailSendTester({
           </div>
         ) : null}
 
-        <button
-          type="submit"
-          disabled={!enabled || isSending}
-          className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-3 font-label-bold text-label-bold text-on-primary transition hover:bg-primary-container disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <MIcon name="send" fill />
-          {isSending ? "กำลังส่ง" : "ส่งอีเมลทดสอบ"}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="submit"
+            value="draft"
+            disabled={!enabled || isSending}
+            className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-3 font-label-bold text-label-bold text-on-primary transition hover:bg-primary-container disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <MIcon name="drafts" fill />
+            {isSending ? "กำลังดำเนินการ" : "สร้าง Draft"}
+          </button>
+          <button
+            type="submit"
+            value="send"
+            disabled={!enabled || isSending}
+            className="inline-flex items-center gap-2 rounded-full bg-surface-container-lowest px-5 py-3 font-label-bold text-label-bold text-on-surface ring-1 ring-outline-variant transition hover:bg-surface-container disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <MIcon name="send" fill />
+            {isSending ? "กำลังดำเนินการ" : "ส่งจริงทันที"}
+          </button>
+        </div>
       </form>
     </section>
   );
@@ -1187,8 +1226,8 @@ function GmailMailboxExplorer({ enabled }: { enabled: boolean }) {
       </div>
 
       <p className="mb-4 rounded-lg bg-surface-container-lowest px-4 py-3 text-body-sm text-on-surface-variant">
-        ถ้าเคยเชื่อม Gmail ก่อนเพิ่มระบบอ่านเมล ให้กดตัดการเชื่อมต่อแล้วเชื่อมใหม่
-        เพื่อขอสิทธิ์ `gmail.readonly`
+        ถ้าเคยเชื่อม Gmail ก่อนเพิ่มระบบอ่าน/ร่าง/ส่งเมล ให้กดตัดการเชื่อมต่อแล้วเชื่อมใหม่
+        เพื่อขอสิทธิ์ `gmail.readonly`, `gmail.compose` และ `gmail.send`
       </p>
 
       <form onSubmit={searchMessages} className="flex flex-col gap-3 sm:flex-row">

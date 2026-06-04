@@ -4,6 +4,7 @@ import {
   GmailConfigurationError,
   GmailConnectionError,
   GMAIL_SESSION_COOKIE,
+  createGmailDraft,
   getGmailConfig,
   getUsableAccessToken,
   isUuid,
@@ -19,6 +20,17 @@ import {
 } from "@/lib/rag";
 
 const MAX_HISTORY_MESSAGES = 24;
+const GEMINI_API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
+
+type GeminiGenerateResponse = {
+  candidates?: Array<{
+    content?: {
+      parts?: Array<{
+        text?: string;
+      }>;
+    };
+  }>;
+};
 
 export async function POST(request: NextRequest) {
   let payload: unknown;
@@ -163,7 +175,7 @@ async function answerGmailChatAction(
     if (!isUuid(sessionId)) {
       return {
         answer:
-          "ยังไม่ได้เชื่อม Gmail ในเบราว์เซอร์นี้ครับ กด Connectors > Gmail > เชื่อมต่อก่อน แล้วค่อยสั่งส่งหรือค้นเมลอีกครั้ง",
+          "ยังไม่ได้เชื่อม Gmail ในเบราว์เซอร์นี้ครับ กด Connectors > Gmail > เชื่อมต่อก่อน แล้วค่อยสั่งร่าง ส่ง หรือค้นเมลอีกครั้ง",
         sources: [],
       };
     }
@@ -197,16 +209,36 @@ async function answerGmailChatAction(
       };
     }
 
+    const email = await composeEmailForChatAction(action);
+
+    if (action.type === "draft") {
+      const result = await createGmailDraft({
+        accessToken,
+        to: action.to,
+        subject: email.subject,
+        body: email.body,
+      });
+
+      return {
+        answer: `สร้าง draft ใน Gmail เรียบร้อยครับ ยังไม่ได้ส่งออกไป\n\nถึง: ${
+          action.to
+        }\nหัวข้อ: ${email.subject}\n\nเนื้อหา:\n${email.body}${
+          result.id ? `\n\nDraft ID: ${result.id}` : ""
+        }`,
+        sources: [],
+      };
+    }
+
     const result = await sendGmailMessage({
       accessToken,
       to: action.to,
-      subject: action.subject,
-      body: action.body,
+      subject: email.subject,
+      body: email.body,
     });
 
     return {
       answer: `ส่งอีเมลผ่าน Gmail เรียบร้อยครับ\n\nถึง: ${action.to}\nหัวข้อ: ${
-        action.subject
+        email.subject
       }${result.id ? `\nMessage ID: ${result.id}` : ""}`,
       sources: [],
     };
@@ -244,10 +276,18 @@ async function answerGmailChatAction(
 
 type GmailChatAction =
   | {
+      type: "draft";
+      to: string;
+      subject?: string;
+      body?: string;
+      instruction: string;
+    }
+  | {
       type: "send";
       to: string;
-      subject: string;
-      body: string;
+      subject?: string;
+      body?: string;
+      instruction: string;
     }
   | {
       type: "search";
@@ -257,23 +297,33 @@ type GmailChatAction =
 function parseGmailChatAction(question: string): GmailChatAction | null {
   const normalizedQuestion = question.replace(/\s+/g, " ").trim();
   const hasMailSignal = /(?:gmail|อีเมล|email|เมล)/i.test(normalizedQuestion);
-
-  if (!hasMailSignal) {
-    return null;
-  }
-
   const recipient = extractEmailAddress(normalizedQuestion);
-  const hasSendIntent = /(?:ส่ง|ส่งให้|ส่งเลย|พร้อมส่ง|send)/i.test(
+  const hasComposeIntent = /(?:เขียน|ร่าง|draft|ดราฟ|compose|แต่ง|ช่วยเขียน|ส่งเมล|ส่งอีเมล|ส่งให้|ส่งไป|ยังไม่ต้องส่ง|ไม่ต้องส่ง|อย่าเพิ่งส่ง)/i.test(
+    normalizedQuestion,
+  );
+  const hasDraftIntent = /(?:ร่าง|draft|ดราฟ|แค่ร่าง|ยังไม่ต้องส่ง|ไม่ต้องส่ง|อย่าเพิ่งส่ง|ให้ผมกดเอง|ให้ user กดเอง|กดเอง)/i.test(
+    normalizedQuestion,
+  );
+  const hasExplicitSendIntent = /(?:ส่งเลย|ส่งจริง|ส่งทันที|ส่งไปเลย|ส่งให้เลย|send now|send it now|send immediately)/i.test(
     normalizedQuestion,
   );
 
-  if (recipient && hasSendIntent) {
+  if (
+    recipient &&
+    hasComposeIntent &&
+    (hasMailSignal || normalizedQuestion.includes("@"))
+  ) {
     return {
-      type: "send",
+      type: hasExplicitSendIntent && !hasDraftIntent ? "send" : "draft",
       to: recipient,
-      subject: extractExplicitSubject(question) ?? "ทดสอบส่งอีเมลจาก PSC AI",
-      body: extractExplicitBody(question) ?? buildDefaultEmailBody(),
+      subject: extractExplicitSubject(question) ?? undefined,
+      body: extractExplicitBody(question) ?? undefined,
+      instruction: question,
     };
+  }
+
+  if (!hasMailSignal) {
+    return null;
   }
 
   const hasSearchIntent = /(?:ค้น|หา|อ่าน|ดู|inbox|กล่องจดหมาย)/i.test(
@@ -288,6 +338,95 @@ function parseGmailChatAction(question: string): GmailChatAction | null {
   }
 
   return null;
+}
+
+async function composeEmailForChatAction(
+  action: Extract<GmailChatAction, { type: "draft" | "send" }>,
+): Promise<{ subject: string; body: string }> {
+  if (action.subject && action.body) {
+    return {
+      subject: action.subject,
+      body: action.body,
+    };
+  }
+
+  const fallback = {
+    subject: action.subject ?? "ร่างอีเมลจาก PSC AI",
+    body: action.body ?? buildDefaultEmailBody(action.instruction),
+  };
+  const geminiApiKey =
+    process.env.GEMINI_API_KEY ?? process.env.GOOGLE_GENERATIVE_AI_API_KEY ?? "";
+
+  if (!geminiApiKey) {
+    return fallback;
+  }
+
+  const generationModel = process.env.GEMINI_GENERATION_MODEL || "gemini-3.5-flash";
+  const prompt = `คุณคือผู้ช่วยเขียนอีเมลภาษาไทยให้ผู้ใช้
+สร้างหัวข้อและเนื้อหาอีเมลจากคำสั่งนี้ โดยให้อ่านเป็นธรรมชาติ สุภาพ และพร้อมให้ผู้ใช้ตรวจใน Gmail Draft
+
+กติกา:
+- อย่าใส่ข้อมูลส่วนตัวจริงที่ผู้ใช้ไม่ได้ให้มา
+- ถ้าผู้ใช้บอกว่า mockup หรือข้อมูลไม่ชัด ให้ทำเป็นอีเมลตัวอย่างทั่วไปที่ปลอดภัย
+- ห้ามบอกว่าส่งแล้ว เพราะระบบจะสร้าง draft ให้ตรวจเท่านั้น ยกเว้น route ภายนอกจะส่งเอง
+- ตอบเป็น JSON object เท่านั้น รูปแบบ {"subject":"...","body":"..."}
+- body ใช้บรรทัดใหม่ได้ และต้องไม่เกินประมาณ 3500 ตัวอักษร
+
+ผู้รับ: ${action.to}
+คำสั่งผู้ใช้:
+${action.instruction}
+
+หัวข้อที่ผู้ใช้ระบุไว้ ถ้ามี:
+${action.subject ?? "(ไม่มี)"}
+
+เนื้อหาที่ผู้ใช้ระบุไว้ ถ้ามี:
+${action.body ?? "(ไม่มี)"}`;
+
+  try {
+    const response = await fetch(
+      `${GEMINI_API_BASE_URL}/models/${generationModel}:generateContent`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": geminiApiKey,
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              role: "user",
+              parts: [{ text: prompt }],
+            },
+          ],
+          generationConfig: {
+            temperature: 0.35,
+            responseMimeType: "application/json",
+          },
+        }),
+        cache: "no-store",
+      },
+    );
+
+    if (!response.ok) {
+      return fallback;
+    }
+
+    const data = (await response.json()) as GeminiGenerateResponse;
+    const text =
+      data.candidates?.[0]?.content?.parts
+        ?.map((part) => part.text)
+        .filter(Boolean)
+        .join("\n")
+        .trim() ?? "";
+    const parsed = parseGeneratedEmailJson(text);
+
+    return {
+      subject: action.subject ?? parsed?.subject ?? fallback.subject,
+      body: action.body ?? parsed?.body ?? fallback.body,
+    };
+  } catch {
+    return fallback;
+  }
 }
 
 function extractEmailAddress(text: string): string | null {
@@ -318,11 +457,39 @@ function extractExplicitBody(text: string): string | null {
   return body.length > 0 ? body.slice(0, 4000) : null;
 }
 
-function buildDefaultEmailBody(): string {
+function parseGeneratedEmailJson(
+  text: string,
+): { subject: string; body: string } | null {
+  const jsonText = text.match(/\{[\s\S]*\}/)?.[0] ?? text;
+
+  try {
+    const parsed = JSON.parse(jsonText) as {
+      subject?: unknown;
+      body?: unknown;
+    };
+    const subject = typeof parsed.subject === "string" ? parsed.subject.trim() : "";
+    const body = typeof parsed.body === "string" ? parsed.body.trim() : "";
+
+    if (!subject || !body) {
+      return null;
+    }
+
+    return {
+      subject: subject.slice(0, 160),
+      body: body.slice(0, 4000),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function buildDefaultEmailBody(instruction: string): string {
   return [
     "สวัสดีครับ",
     "",
-    "นี่คืออีเมลทดสอบจาก PSC AI เพื่อยืนยันว่า Gmail connector สามารถส่งอีเมลได้จริง",
+    "ผมร่างอีเมลฉบับนี้จากคำสั่งที่ได้รับใน PSC AI ครับ",
+    "",
+    `คำสั่งต้นทาง: ${instruction.slice(0, 500)}`,
     "",
     "ขอบคุณครับ",
   ].join("\n");
